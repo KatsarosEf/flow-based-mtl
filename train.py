@@ -7,13 +7,12 @@ from utils.dataset import MTL_Dataset
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from torchmetrics.functional import ssim
 from losses import DeblurringLoss, SemanticSegmentationLoss, HomographyLoss
-from metrics import SegmentationMetrics, DeblurringMetrics, HomographyMetrics, PSNR_masked
+from metrics import SegmentationMetrics, DeblurringMetrics, HomographyMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVerticalFlip, RandomColorChannel,\
     ColorJitter
-from utils.network_utils import model_save, model_load, measure_efficiency
+from utils.network_utils import model_save, model_load
 import torch.nn.functional as F
 
 task_weights = {'segment': 0.0003,
@@ -176,7 +175,7 @@ def main(args):
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = VideoMIMOUNet(['segment', 'deblur', 'homography'], nr_blocks=5, block='res').cuda()
+    model = VideoMIMOUNet(tasks, nr_blocks=args.nr_blocks).cuda()
     # params, fps, flops = measure_efficiency(args)
     # print(params, fps, flops)
 
