@@ -207,8 +207,9 @@ class HomographyLoss(nn.Module):
 class EPELoss(nn.Module):
 	def __init__(self):
 		super(EPELoss, self).__init__()
+		self.eps = 1e-6
 	def forward(self, flow_pred, flow_gt):
-		return torch.sum((flow_pred - flow_gt)**2, dim=1).sqrt()
+		return torch.sum((flow_pred - flow_gt)**2 + self.eps, dim=1).sqrt()
 
 class OpticalFlowLoss(nn.Module):
 	def __init__(self, device='cuda'):
