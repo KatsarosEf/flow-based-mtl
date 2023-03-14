@@ -204,4 +204,24 @@ class HomographyLoss(nn.Module):
 			MaceLoss = self.MaceLoss(output, gt)
 		return MaceLoss
 
+class EPELoss(nn.Module):
+	def __init__(self):
+		super(EPELoss, self).__init__()
+		self.eps = 1e-6
+	def forward(self, flow_pred, flow_gt):
+		return torch.sum((flow_pred - flow_gt)**2 + self.eps, dim=1).sqrt()
+
+class OpticalFlowLoss(nn.Module):
+	def __init__(self, device='cuda'):
+		super(OpticalFlowLoss, self).__init__()
+		self.EPELoss = EPELoss().to(device)
+	def forward(self, output, gt):
+		if type(output) is list:
+			losses = []
+			for num, elem in enumerate(output[::-1]):
+				losses.append(self.EPELoss(elem, gt[1]))
+			EPELoss = sum(losses)
+		else:
+			EPELoss = self.EPELoss(output, gt)
+		return EPELoss
 
