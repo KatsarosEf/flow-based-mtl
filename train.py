@@ -148,8 +148,10 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'homography'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
-                                                    RandomVerticalFlip(), ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([
+                                                    # RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
+                                                    # RandomVerticalFlip(),
+                                                    ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
@@ -175,7 +177,7 @@ def main(args):
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = VideoMIMOUNet(tasks, nr_blocks=args.nr_blocks).cuda()
+    model = VideoMIMOUNet(tasks, nr_blocks=args.nr_blocks, block=args.block).cuda()
     # params, fps, flops = measure_efficiency(args)
     # print(params, fps, flops)
 
@@ -213,8 +215,12 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../raid/dblab_real', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='../raid/ecai-mtl', type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../raid/dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
+    # parser.add_argument('--out', dest='out', help='Set output path', default='../raid/ecai-mtl', type=str)
+
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+
 
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
@@ -226,7 +232,7 @@ if __name__ == '__main__':
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
 
     parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)
-    parser.add_argument('--bs', help='Set size of the batch size', default=8, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=2, type=int)
     parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)

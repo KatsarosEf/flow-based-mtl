@@ -42,15 +42,13 @@ class MTL_Dataset(data.Dataset):
         self.deblur_frames = []
         # Homographies
         self.do_homo = do_homo
-        self.homos = []
+        self.flows = []
 
         dataset_dir = os.path.join(root, self.split)
         for video in os.listdir(dataset_dir):
-            image_dir, deblur_dir, mask_dir, homo_file = [os.path.join(dataset_dir, video, directory)
-                                                         for directory in ['input', 'GT', 'masks', 'homo_4df.pkl']]
-            if do_homo:
-                with open(homo_file, 'rb') as homo_pickle:
-                    homographies = pickle.load(homo_pickle)
+            image_dir, deblur_dir, mask_dir, of_dir = [os.path.join(dataset_dir, video, directory)
+                                                         for directory in ['input', 'GT', 'masks', 'OF_backw']]
+
             filenames = sorted(os.listdir(image_dir), key=lambda x: int(os.path.basename(x)[:-4]))
             if seq_len is None:
                 seq_len_inner = len(filenames)
@@ -58,11 +56,15 @@ class MTL_Dataset(data.Dataset):
                 seq_len_inner = seq_len
             for first_idx in range(0, len(filenames)-seq_len_inner+1, seq_len_inner):
 
-                seq_images, seq_masks, seq_deblur_frames, seq_homos = ([] for _ in range(4))
+                seq_images, seq_masks, seq_deblur_frames, seq_flows = ([] for _ in range(4))
 
                 for file_idx in range(first_idx, first_idx + seq_len_inner):
 
-                    filename = filenames[file_idx]
+                    try:
+                        filename = filenames[file_idx+1]
+                    except:
+                        continue
+                    ofname = filenames[file_idx]
                     # Images
                     _image = os.path.join(image_dir, filename)
                     assert os.path.isfile(_image)
@@ -82,13 +84,14 @@ class MTL_Dataset(data.Dataset):
 
                     # Homographies
                     if do_homo:
-                        _homo = homographies[file_idx]
-                        seq_homos.append(_homo)
+                        _optical_flow = os.path.join(of_dir, ofname[:-4] + '.npy')
+                        assert os.path.isfile(_optical_flow)
+                        seq_flows.append(_optical_flow)
 
                 self.images.append(seq_images)
                 self.masks.append(seq_masks)
                 self.deblur_frames.append(seq_deblur_frames)
-                self.homos.append(seq_homos)
+                self.flows.append(seq_flows)
 
         if seq_len is None:
             return
@@ -113,7 +116,7 @@ class MTL_Dataset(data.Dataset):
             sample['deblur'] = self._load_deblur(index)
 
         if self.do_homo:
-            sample['homography'] = ((h, o) for h, o in zip(self.homos[index].copy(), self.create_offsets(self.homos[index], sample['image'])))
+            sample['homography'] = self._load_flow(index)
 
         if self.meta:
             sample['meta'] = {'paths': self.images[index],

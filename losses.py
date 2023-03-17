@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from models.ade20k import ModelBuilder
 
 
 class SemanticSegmentationLoss(nn.Module):
@@ -78,7 +77,7 @@ class CharbonnierLoss(nn.Module):
 
 class DeblurringLoss(nn.Module):
 
-	def __init__(self, CL_factor=1, device='cuda', sobel=True, perceptual=False):
+	def __init__(self, CL_factor=1, device='cuda', sobel=False, perceptual=False):
 
 		super(DeblurringLoss, self).__init__()
 		self.sobel = sobel
