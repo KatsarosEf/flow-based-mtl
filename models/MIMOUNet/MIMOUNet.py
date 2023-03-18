@@ -43,7 +43,7 @@ class ExpandingBlock(nn.Module):
         super(ExpandingBlock, self).__init__()
         base_channel = 32
 
-        self.scale_homo = torch.eye(3).cuda()
+        self.scale_homo = torch.eye(3)
         self.scale_homo[0, 0] = 2
         self.scale_homo[1, 1] = 2
 
@@ -204,8 +204,8 @@ if __name__ == "__main__":
 
 
     load_model_path = os.path.join('../../resume', 'ckpt_100.pth')
-    model = VideoMIMOUNet(['segment', 'deblur', 'homography'], nr_blocks=5, block='fft').cuda()
-    model = torch.nn.DataParallel(model).cuda()
+    model = VideoMIMOUNet(['segment', 'deblur', 'homography'], nr_blocks=5, block='fft').to(args.device)
+    model = torch.nn.DataParallel(model).to(args.device)
     _ = model_load(load_model_path, model)
 
 

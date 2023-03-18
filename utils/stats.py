@@ -20,25 +20,25 @@ print(val_fr_nr)
 
 # homography
 hm_train = sorted(glob.glob(os.path.join(src, 'train', '*', '*.pkl')))
-i = homo2offsets(torch.eye(3).unsqueeze(0).cuda(), 800, 800)
+i = homo2offsets(torch.eye(3).unsqueeze(0).to(args.device), 800, 800)
 mace_train = []
 for homo in hm_train:
     with open(homo, 'rb') as homo_pickle:
         homographies = torch.FloatTensor(pickle.load(homo_pickle))
     for homography in homographies:
-        off = homo2offsets(homography.unsqueeze(0).cuda(), 800, 800)
+        off = homo2offsets(homography.unsqueeze(0).to(args.device), 800, 800)
         mace_train.append(((off - i) ** 2).sum(dim=2).sqrt().mean())
 print(sum(mace_train).item() / len(mace_train))
 
 
 hm_val = sorted(glob.glob(os.path.join(src, 'val', '*', '*.pkl')))
-i = homo2offsets(torch.eye(3).unsqueeze(0).cuda(), 800, 800)
+i = homo2offsets(torch.eye(3).unsqueeze(0).to(args.device), 800, 800)
 mace_val = []
 for homo in hm_val:
     with open(homo, 'rb') as homo_pickle:
         homographies = torch.FloatTensor(pickle.load(homo_pickle))
     for homography in homographies:
-        off = homo2offsets(homography.unsqueeze(0).cuda(), 800, 800)
+        off = homo2offsets(homography.unsqueeze(0).to(args.device), 800, 800)
         mace_val.append(((off - i) ** 2).sum(dim=2).sqrt().mean())
 print(sum(mace_val).item() / len(mace_val))
 

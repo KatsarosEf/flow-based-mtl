@@ -37,6 +37,10 @@ def PSNR_masked(img1, img2, mask):
 	return 20 * torch.log10(1.0 / torch.sqrt(mse))
 
 
+def epe(flow_pred, flow_gt):
+	return torch.sum((flow_pred - flow_gt)**2 + 1e-6, dim=1).sqrt() #TODO metrics needs to be taken per average, loss is to be squared only
+
+
 class Metric(Module):
 
 	def __init__(self):
@@ -50,6 +54,10 @@ class Metric(Module):
 	def compute_metric(self, output, gt):
 		return None
 
+class EPE(Metric):
+
+	def compute_metric(self, output, gt):
+		return epe(output, gt)
 
 class IoU(Metric):
 
@@ -85,6 +93,15 @@ class MACE(Metric):
 
 	def __init__(self, num):
 		super(MACE, self).__init__()
+		self.num = num
+
+	def compute_metric(self, output, gt):
+		return ((output[self.num] * (2 ** (2-self.num)) - gt) ** 2).sum(dim=2).sqrt().mean()
+
+class EPE(Metric):
+
+	def __init__(self, num):
+		super(EPE, self).__init__()
 		self.num = num
 
 	def compute_metric(self, output, gt):
@@ -136,6 +153,24 @@ class HomographyMetrics(Module):
 		with torch.no_grad():
 			metric_results = {metric: metric_function(output, gt[1]) for metric, metric_function in self.metrics.items()}
 		return metric_results
+
+class OpticalFlowMetrics(Module):
+
+	def __init__(self):
+		super(OpticalFlowMetrics, self).__init__()
+		self.metrics = {
+			'EPE': EPE(num=2),
+			'EPE_med': EPE(num=1),
+			'EPE_low': EPE(num=0),
+		}
+
+	def forward(self, output, gt):
+		with torch.no_grad():
+			metric_results = {metric: metric_function(output, gt[1]) for metric, metric_function in self.metrics.items()}
+		return metric_results
+
+
+
 
 
 if __name__ == '__main__':

@@ -27,7 +27,7 @@ class EdgeLoss(nn.Module):
 		k = torch.Tensor([[.05, .25, .4, .25, .05]])
 		self.kernel = torch.matmul(k.t(),k).unsqueeze(0).repeat(3,1,1,1)
 		if torch.cuda.is_available():
-			self.kernel = self.kernel.cuda()
+			self.kernel = self.kernel.to(args.device)
 		self.loss = CharbonnierLoss()
 
 	def conv_gauss(self, img):
@@ -203,12 +203,14 @@ class HomographyLoss(nn.Module):
 			MaceLoss = self.MaceLoss(output, gt)
 		return MaceLoss
 
+
 class EPELoss(nn.Module):
 	def __init__(self):
 		super(EPELoss, self).__init__()
 		self.eps = 1e-6
 	def forward(self, flow_pred, flow_gt):
 		return torch.sum((flow_pred - flow_gt)**2 + self.eps, dim=1).sqrt()
+
 
 class OpticalFlowLoss(nn.Module):
 	def __init__(self, device='cuda'):

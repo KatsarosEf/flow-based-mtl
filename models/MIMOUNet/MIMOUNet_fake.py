@@ -44,7 +44,7 @@ class ExpandingBlock(nn.Module):
         super(ExpandingBlock, self).__init__()
         base_channel = 32
 
-        self.scale_homo = torch.eye(3).cuda()
+        self.scale_homo = torch.eye(3).to(args.device)
         self.scale_homo[0, 0] = 2
         self.scale_homo[1, 1] = 2
 

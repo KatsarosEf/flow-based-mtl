@@ -7,8 +7,8 @@ from utils.dataset import MTL_Dataset
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from losses import DeblurringLoss, SemanticSegmentationLoss, HomographyLoss
-from metrics import SegmentationMetrics, DeblurringMetrics, HomographyMetrics
+from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
+from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVerticalFlip, RandomColorChannel,\
     ColorJitter
@@ -17,7 +17,7 @@ import torch.nn.functional as F
 
 task_weights = {'segment': 0.0003,
                 'deblur': 0.0003,
-                'homography': 1.2}
+                'flow': 1.2}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
@@ -34,7 +34,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
 
             # Load the data and mount them on cuda
             if frame == args.prev_frames:
-                frames = [seq['image'][i].cuda(non_blocking=True) for i in range(frame + 1)]
+                frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
                 m = torch.cat([seq['segment'][0].unsqueeze(1), 1 - seq['segment'][0].unsqueeze(1)], 1).float()
                 m2 = [F.interpolate(m, scale_factor=0.25),
                       F.interpolate(m, scale_factor=0.5),
@@ -44,11 +44,11 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
                       F.interpolate(seq['image'][0], scale_factor=0.5),
                       seq['image'][0]]
             else:
-                frames.append(seq['image'][frame].cuda(non_blocking=True))
+                frames.append(seq['image'][frame].to(args.device))
                 del frames[0]
 
-            gt_dict = {task: seq[task][frame].cuda(non_blocking=True) if type(seq[task][frame]) is torch.Tensor else
-            [e.cuda(non_blocking=True) for e in seq[task][frame]] for task in tasks}
+            gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
+            [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
@@ -61,7 +61,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
 
             task_weights = {'segment': sum(losses.values()).detach() / (3 * losses['segment']).detach(),
                             'deblur': sum(losses.values()).detach() / (3 * losses['deblur']).detach(),
-                            'homography': sum(losses.values()).detach() / (3 * losses['homography']).detach()}
+                            'flow': sum(losses.values()).detach() / (3 * losses['flow']).detach()}
             losses = {task: losses[task] * task_weights[task] for task in tasks}
 
             loss = sum(losses.values())
@@ -146,7 +146,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
 def main(args):
 
 
-    tasks = [task for task in ['segment', 'deblur', 'homography'] if getattr(args, task)]
+    tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
     transformations = {'train': transforms.Compose([
                                                     # RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
@@ -154,34 +154,34 @@ def main(args):
                                                     ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
-    data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
+    data = {split: MTL_Dataset(tasks, args.data_path, "train", args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
-    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
+    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
               for split in ['train', 'val']}
 
 
     losses_dict = {
-        'segment': SemanticSegmentationLoss().cuda(),
-        'deblur': DeblurringLoss().cuda(),
-        'homography': HomographyLoss().cuda()
+        'segment': SemanticSegmentationLoss().to(args.device),
+        'deblur': DeblurringLoss().to(args.device),
+        'flow': OpticalFlowLoss().to(args.device)
     }
     losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
 
     metrics_dict = {
-        'segment': SegmentationMetrics().cuda(),
-        'deblur': DeblurringMetrics().cuda(),
-        'homography': HomographyMetrics().cuda()
+        'segment': SegmentationMetrics().to(args.device),
+        'deblur': DeblurringMetrics().to(args.device),
+        'flow': OpticalFlowMetrics().to(args.device)
 
     }
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = VideoMIMOUNet(tasks, nr_blocks=args.nr_blocks, block=args.block).cuda()
+    model = VideoMIMOUNet(tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
     # params, fps, flops = measure_efficiency(args)
     # print(params, fps, flops)
 
-    model = torch.nn.DataParallel(model).cuda()
+    model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
@@ -195,7 +195,7 @@ def main(args):
         if 'debug' in args.out:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
         else:
-            os.makedirs(os.path.join(args.out, 'models'))
+            os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
     wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
@@ -215,11 +215,12 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../raid/dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
-    # parser.add_argument('--out', dest='out', help='Set output path', default='../raid/ecai-mtl', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
+    parser.add_argument("--device", dest='device', default="cpu", type=str)
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
 
 
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
@@ -228,7 +229,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
-    parser.add_argument("--homography", action='store_false', help="Flag for  homography estimation")
+    parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
 
     parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)

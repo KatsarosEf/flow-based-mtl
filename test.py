@@ -665,9 +665,9 @@ def evaluate(args, dataloader, model, metrics_dict):
                 m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200), device='cuda'),
                       torch.zeros((frames[0].shape[0], 2, 400, 400), device='cuda'),
                       torch.zeros((frames[0].shape[0], 2, 800, 800), device='cuda')]
-                d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).cuda(),
-                      F.interpolate(seq['image'][0], scale_factor=0.5).cuda(),
-                      seq['image'][0].cuda()]
+                d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
+                      F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
+                      seq['image'][0].to(args.device)]
             else:
                 frames.append(seq['image'][frame].cuda(non_blocking=True))
                 frames.pop(0)
@@ -742,14 +742,14 @@ def main(args):
 
 
     metrics_dict = {
-        'segment': SegmentationMetrics().cuda(),
-        'deblur': DeblurringMetrics().cuda(),
-        'homography': HomographyMetrics().cuda()}
+        'segment': SegmentationMetrics().to(args.device),
+        'deblur': DeblurringMetrics().to(args.device),
+        'homography': HomographyMetrics().to(args.device)}
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = VideoMIMOUNet(tasks, args.block, args.nr_blocks).cuda()
-    model = torch.nn.DataParallel(model).cuda()
+    model = VideoMIMOUNet(tasks, args.block, args.nr_blocks).to(args.device)
+    model = torch.nn.DataParallel(model).to(args.device)
 
     # Load checkpoint
     checkpoint_file_name = '/home/efklidis/models/MICCAI-1' #MICCAI-2
