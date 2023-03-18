@@ -50,7 +50,6 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
             [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
-
             # import cv2
             # cv2.imwrite('./frame-t-1.jpg', frames[0][0].permute(1, 2, 0).numpy() * 255.0)
             # cv2.imwrite('./frame-t.jpg', frames[1][0].permute(1, 2, 0).numpy() * 255.0)
@@ -107,7 +106,6 @@ def val(args, dataloader, model, metrics_dict, epoch):
         for seq_idx, seq in enumerate(dataloader):
             for frame in range(args.prev_frames, args.seq_len):
                 # Load the data and mount them on cuda
-                path = [x.split('/')[-3] + '_' + x.split('/')[-1] for x in seq['meta']['paths'][frame]]
                 if frame == args.prev_frames:
                     frames = [seq['image'][i].cuda(non_blocking=True) for i in range(frame + 1)]
                     m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200), device='cuda'),

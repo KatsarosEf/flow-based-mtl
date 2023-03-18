@@ -62,9 +62,6 @@ class ExpandingBlock(nn.Module):
 
         self.FAMS = nn.ModuleList([GSA(128), GSA(64), GSA(32)])
 
-
-        # self.FAMS = nn.ModuleList([FAM(base_channel * 4), FAM(base_channel * 2), FAM(base_channel)])
-
         self.ConvsOutDeb = nn.ModuleList(
             [BasicConv(base_channel * 4, 64, kernel_size=3, relu=True, stride=1),
              BasicConv(64, 3, kernel_size=3, relu=False, stride=1),
@@ -196,7 +193,7 @@ if __name__ == "__main__":
 
 
     load_model_path = os.path.join('../../resume', 'ckpt_100.pth')
-    model = VideoMIMOUNet(['segment', 'deblur', 'homography'], nr_blocks=5, block='fft').to(args.device)
+    model = VideoMIMOUNet(['segment', 'deblur', 'flow'], nr_blocks=5, block='fft').to(args.device)
     model = torch.nn.DataParallel(model).to(args.device)
     _ = model_load(load_model_path, model)
 

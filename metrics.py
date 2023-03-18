@@ -74,21 +74,6 @@ class SSIM(Metric):
 		return ssim(output.clip(0,1), gt, data_range=1.0)
 
 
-class HomographyDistance(Metric):
-
-	def compute_metric(self, output, gt):
-		return torch.abs(output-gt).sum()
-
-
-class MACE(Metric):
-
-	def __init__(self, num):
-		super(MACE, self).__init__()
-		self.num = num
-
-	def compute_metric(self, output, gt):
-		return (output[self.num] - torch.nn.functional.interpolate(gt.permute(0,3,1,2), scale_factor=(2 ** (2-self.num)))).mean()
-
 class EPE(Metric):
 
 	def __init__(self, num):
@@ -96,7 +81,7 @@ class EPE(Metric):
 		self.num = num
 
 	def compute_metric(self, output, gt):
-		return ((output[self.num] - gt)).sum(dim=2).sqrt().mean()
+		return (output[self.num] - torch.nn.functional.interpolate(gt.permute(0,3,1,2), scale_factor=(2 ** (self.num-2)))).mean()
 
 
 class DeblurringMetrics(Module):
@@ -129,22 +114,6 @@ class SegmentationMetrics(Module):
 			metric_results = {metric: metric_function(output, gt) for metric, metric_function in self.metrics.items()}
 		return metric_results
 
-
-class HomographyMetrics(Module):
-
-	def __init__(self):
-		super(HomographyMetrics, self).__init__()
-		self.metrics = {
-			'MACE': MACE(num=2),
-			'MACE_med': MACE(num=1),
-			'MACE_low': MACE(num=0),
-		}
-
-	def forward(self, output, gt):
-		with torch.no_grad():
-			metric_results = {metric: metric_function(output, gt[1]) for metric, metric_function in self.metrics.items()}
-		return metric_results
-
 class OpticalFlowMetrics(Module):
 
 	def __init__(self):
@@ -160,14 +129,4 @@ class OpticalFlowMetrics(Module):
 			metric_results = {metric: metric_function(output, gt) for metric, metric_function in self.metrics.items()}
 		return metric_results
 
-
-
-
-
-if __name__ == '__main__':
-	prediction = torch.tensor([[[1,1,1],[1,1,1],[1,1,1]], [[0,0,0],[1,1,0],[0,0,0]]])
-	gt = torch.tensor([[[1,1,1],[1,1,1],[1,1,1]], [[0,1,0],[0,1,0],[0,0,0]]])
-
-	segmentation_metrics = SegmentationMetrics()
-	print(segmentation_metrics(prediction, gt))
 
