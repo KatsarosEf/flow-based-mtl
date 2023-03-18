@@ -151,7 +151,7 @@ class EPELoss(nn.Module):
 		self.eps = 1e-6
 
 	def forward(self, flow_pred, flow_gt):
-		return torch.mean(torch.sqrt( (flow_pred - flow_gt)**2) + self.eps)
+		return torch.mean(torch.sqrt((flow_pred - flow_gt)**2 + self.eps))
 
 
 class OpticalFlowLoss(nn.Module):

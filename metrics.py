@@ -1,7 +1,7 @@
 import torch
 from torch.nn import Module
 
-from torchmetrics.functional import psnr, ssim#, dice_score
+from torchmetrics.functional import psnr, ssim
 
 
 def binary_segmentation_postprocessing(output: torch.Tensor):
@@ -36,11 +36,6 @@ def PSNR_masked(img1, img2, mask):
 	mse = (mse * mask).mean(1).sum() / mask.sum()
 	return 20 * torch.log10(1.0 / torch.sqrt(mse))
 
-
-def epe(flow_pred, flow_gt):
-	return torch.sum((flow_pred - flow_gt)**2 + 1e-6, dim=1).sqrt() #TODO metrics needs to be taken per average, loss is to be squared only
-
-
 class Metric(Module):
 
 	def __init__(self):
@@ -54,10 +49,6 @@ class Metric(Module):
 	def compute_metric(self, output, gt):
 		return None
 
-class EPE(Metric):
-
-	def compute_metric(self, output, gt):
-		return epe(output, gt)
 
 class IoU(Metric):
 
@@ -96,7 +87,7 @@ class MACE(Metric):
 		self.num = num
 
 	def compute_metric(self, output, gt):
-		return ((output[self.num] * (2 ** (2-self.num)) - gt) ** 2).sum(dim=2).sqrt().mean()
+		return (output[self.num] - torch.nn.functional.interpolate(gt.permute(0,3,1,2), scale_factor=(2 ** (2-self.num)))).mean()
 
 class EPE(Metric):
 
@@ -105,7 +96,7 @@ class EPE(Metric):
 		self.num = num
 
 	def compute_metric(self, output, gt):
-		return ((output[self.num] * (2 ** (2-self.num)) - gt) ** 2).sum(dim=2).sqrt().mean()
+		return ((output[self.num] - gt)).sum(dim=2).sqrt().mean()
 
 
 class DeblurringMetrics(Module):
@@ -166,7 +157,7 @@ class OpticalFlowMetrics(Module):
 
 	def forward(self, output, gt):
 		with torch.no_grad():
-			metric_results = {metric: metric_function(output, gt[1]) for metric, metric_function in self.metrics.items()}
+			metric_results = {metric: metric_function(output, gt) for metric, metric_function in self.metrics.items()}
 		return metric_results
 
 
