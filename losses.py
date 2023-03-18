@@ -100,7 +100,7 @@ class DeblurringLoss(nn.Module):
 			cl_loss = self.CL(output, gt)
 			el_loss = self.EL(output, gt)
 			#pl_loss = self.PL(output, gt)
-			return self.CL_factor * cl_loss + self.E_factor * el_loss #+ self.P_factor * pl_loss
+			return self.CL_factor * cl_loss + self.E_factor * el_loss# + self.P_factor * pl_loss
 
 class ContentLoss(nn.Module):
 
@@ -108,9 +108,9 @@ class ContentLoss(nn.Module):
 
 		super(ContentLoss, self).__init__()
 		if mode == 'l2':
-			self.loss_function = nn.MSELoss(reduction='sum').to(device)
+			self.loss_function = nn.MSELoss(reduction='mean').to(device)
 		elif mode == 'l1':
-			self.loss_function = nn.L1Loss(reduction='sum').to(device)
+			self.loss_function = nn.L1Loss(reduction='mean').to(device)
 		elif mode == 'charbonnier':
 			self.loss_function = CharbonnierLoss().to(device)
 
@@ -160,7 +160,7 @@ class FFTLoss(nn.Module):
 
 		super(FFTLoss, self).__init__()
 		if mode == 'l2':
-			self.loss_function = nn.MSELoss(reduction='sum').to(device)
+			self.loss_function = nn.MSELoss(reduction='mean').to(device)
 		elif mode == 'l1':
 			self.loss_function = nn.L1Loss(reduction='sum').to(device)
 		elif mode == 'charbonnier':

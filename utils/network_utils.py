@@ -44,7 +44,8 @@ def offsets2homo(offsets, h, w):
     homo = kornia.geometry.transform.get_perspective_transform(corners.repeat(offsets.shape[0], 1, 1), offsets)
     return homo
 
-
+def warp_flow(input, flow, size):
+    return input
 
 
 def model_save(model, optimizer, scheduler, epoch, args, save_best=False):

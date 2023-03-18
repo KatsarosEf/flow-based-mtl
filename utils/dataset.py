@@ -119,7 +119,7 @@ class MTL_Dataset(data.Dataset):
         if self.do_deblur:
             sample['deblur'] = self._load_deblur(index)
 
-        if self.do_homo:
+        if self.do_flow:
             sample['flow'] = self._load_flow(index)
 
         if self.meta:

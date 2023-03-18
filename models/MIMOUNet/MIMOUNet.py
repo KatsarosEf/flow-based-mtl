@@ -1,7 +1,7 @@
 from models.MIMOUNet.layers import *
 from models.HomoEstimator import HomoEstimator, HomoEstimator2, HomoEstimator4
 import kornia
-from utils.network_utils import homo2offsets, offsets2homo
+from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
 class ContractingBlock(nn.Module):
@@ -95,7 +95,7 @@ class ExpandingBlock(nn.Module):
         f2_4, f2_2, f2_1 = f_prv
         m2_4, m2_2, m2_1 = m_prv
         d2_4, d2_2, d2_1 = d_prv
-        outputsD, outputsH, outputsS = list(), list(), list()
+        outputsD, outputsOF, outputsS = list(), list(), list()
 
         ################################ SCALE 4 ######################################
 
@@ -109,17 +109,14 @@ class ExpandingBlock(nn.Module):
         m1_4 = self.ConvsOutS[0](z4)
         outputsS.append(m1_4)
 
-        ### Homography
-
+        ### Flow
         off4 = self.homoEst4(self.FAH[0](f1_4, m1_4, d1_4), self.FAH[0](f2_4, m2_4, d2_4))
-        outputsH.append(off4)
-        homo4 = offsets2homo(off4, 200, 200)
-        homo_hat2 = torch.matmul(torch.matmul(self.scale_homo.to(homo4.device), homo4),
-                                 torch.inverse(self.scale_homo.to(homo4.device)))
+        off4_up = F.interpolate(off4, scale_factor=2)
+        outputsOF.append(off4)
 
-        wf2_2 = kornia.warp_perspective(f2_2, torch.inverse(homo_hat2), (400, 400))
-        wm2_2 = kornia.warp_perspective(m2_2, torch.inverse(homo_hat2), (400, 400))
-        wd2_2 = kornia.warp_perspective(d2_2, torch.inverse(homo_hat2), (400, 400))
+        wf2_2 = warp_flow(f2_2, off4_up, (400, 400))
+        wm2_2 = warp_flow(m2_2, off4_up, (400, 400))
+        wd2_2 = warp_flow(d2_2, off4_up, (400, 400))
 
         ################################ SCALE 2 ######################################
 
@@ -138,15 +135,12 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_2)
 
         ### Homography
-        off2 = self.homoEst2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2))
-        homo2 = torch.matmul(offsets2homo(off2, 400, 400), homo_hat2)
-        off2 = homo2offsets(homo2, 400, 400)
-        outputsH.append(off2)
-        homo_hat1 = torch.matmul(torch.matmul(self.scale_homo.to(homo2.device), homo2),
-                                 torch.inverse(self.scale_homo.to(homo2.device)))
-        wf2_1 = kornia.warp_perspective(f2_1, torch.inverse(homo_hat1), (800, 800))
-        wm2_1 = kornia.warp_perspective(m2_1, torch.inverse(homo_hat1), (800, 800))
-        wd2_1 = kornia.warp_perspective(d2_1, torch.inverse(homo_hat1), (800, 800))
+        off2 = self.homoEst2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
+        off2_up = F.interpolate(off2, scale_factor=2)
+        outputsOF.append(off2)
+        wf2_1 = warp_flow(f2_1, off2_up, (800, 800))
+        wm2_1 = warp_flow(m2_1, off2_up, (800, 800))
+        wd2_1 = warp_flow(d2_1, off2_up, (800, 800))
 
         ################################ SCALE 1 ######################################
 
@@ -165,12 +159,10 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_1)
 
         ### Homography
-        off1 = self.homoEst(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1))
-        homo1 = torch.matmul(offsets2homo(off1, 800, 800), homo_hat1)
-        off1 = homo2offsets(homo1, 800, 800)
-        outputsH.append(off1)
+        off1 = self.homoEst(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1))  + off2_up
+        outputsOF.append(off1)
 
-        return [outputsS, outputsD, outputsH]
+        return [outputsS, outputsD, outputsOF]
 
 class VideoMIMOUNet(nn.Module):
     def __init__(self, tasks, block, nr_blocks):
