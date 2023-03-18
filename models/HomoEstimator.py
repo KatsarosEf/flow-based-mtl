@@ -17,7 +17,7 @@ class HomoEstimator4(nn.Module):
                                          nn.ReLU(inplace=True))
 
 
-        self.head = torch.nn.Sequential(nn.Conv2d(256, 8, kernel_size=3, padding=1))
+        self.head = torch.nn.Sequential(nn.Conv2d(256, 2, kernel_size=3, padding=1))
 
 
     def forward(self, m1, m2):

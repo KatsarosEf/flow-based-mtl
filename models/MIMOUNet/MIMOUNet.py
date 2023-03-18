@@ -5,7 +5,7 @@ from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
 class ContractingBlock(nn.Module):
-    def __init__(self, block, nr_blocks=5):
+    def __init__(self, block, nr_blocks=2):
         super(ContractingBlock, self).__init__()
         base_channel = 32
 
@@ -39,7 +39,7 @@ class ContractingBlock(nn.Module):
         return x, f
 
 class ExpandingBlock(nn.Module):
-    def __init__(self, block, nr_blocks=6):
+    def __init__(self, block, nr_blocks=2):
         super(ExpandingBlock, self).__init__()
         base_channel = 32
 
@@ -159,7 +159,7 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_1)
 
         ### Homography
-        off1 = self.homoEst(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1))  + off2_up
+        off1 = self.homoEst(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1)) + off2_up
         outputsOF.append(off1)
 
         return [outputsS, outputsD, outputsOF]

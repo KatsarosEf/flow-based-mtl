@@ -143,7 +143,7 @@ class MTL_Dataset(data.Dataset):
         return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.masks[index]]
 
     def _load_flow(self, index):
-        return [np.load(path).astype(np.float32) for path in self.flows[index]]
+        return [np.load(path).astype(np.float32) for path in self.flows[index]] # need to process flow to
 
 
     def __len__(self):
