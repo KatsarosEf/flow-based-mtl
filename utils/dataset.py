@@ -26,7 +26,7 @@ class MTL_Dataset(data.Dataset):
 
         do_seg = 'segment' in tasks
         do_deblur = 'deblur' in tasks
-        do_homo = 'flow' in tasks
+        do_flow = 'flow' in tasks
         self.root = root
         self.transform = transform
         self.meta = meta
@@ -41,7 +41,7 @@ class MTL_Dataset(data.Dataset):
         self.do_deblur = do_deblur
         self.deblur_frames = []
         # Homographies
-        self.do_homo = do_homo
+        self.do_flow = do_flow
         self.flows = []
 
         dataset_dir = os.path.join(root, self.split)
@@ -79,8 +79,8 @@ class MTL_Dataset(data.Dataset):
                         assert os.path.isfile(_deblur_frame)
                         seq_deblur_frames.append(_deblur_frame)
 
-                    # Homographies
-                    if do_homo:
+                    # Flows
+                    if do_flow:
 
                         if file_idx==0:
                             _optical_flow = os.path.join(of_dir, filenames[file_idx+1][:-4] + '.npy')
@@ -143,7 +143,7 @@ class MTL_Dataset(data.Dataset):
         return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.masks[index]]
 
     def _load_flow(self, index):
-        return [np.load(path) for path in self.flows[index]]
+        return [np.load(path).astype(np.float32) for path in self.flows[index]]
 
 
     def __len__(self):
@@ -165,7 +165,7 @@ class MTL_TestDataset(data.Dataset):
 
         do_seg = 'segment' in tasks
         do_deblur = 'deblur' in tasks
-        do_homo = 'flow' in tasks
+        do_flow = 'flow' in tasks
         self.root = root
         self.transform = transform
         self.meta = meta
@@ -180,8 +180,8 @@ class MTL_TestDataset(data.Dataset):
         self.do_deblur = do_deblur
         self.deblur_frames = []
         # Homographies
-        self.do_homo = do_homo
-        self.homos = []
+        self.do_flow = do_flow
+        self.flows = []
 
         dataset_dir = os.path.join(root, self.split)
         for video in os.listdir(dataset_dir):
@@ -195,7 +195,7 @@ class MTL_TestDataset(data.Dataset):
                 seq_len_inner = seq_len
             for first_idx in range(0, len(filenames)-seq_len_inner+1, seq_len_inner):
 
-                seq_images, seq_masks, seq_deblur_frames, seq_homos = ([] for _ in range(4))
+                seq_images, seq_masks, seq_deblur_frames, seq_flows = ([] for _ in range(4))
 
                 for file_idx in range(first_idx, first_idx + seq_len_inner):
 
@@ -217,15 +217,25 @@ class MTL_TestDataset(data.Dataset):
                         assert os.path.isfile(_deblur_frame)
                         seq_deblur_frames.append(_deblur_frame)
 
-                    # Homographies
-                    if do_homo:
-                        _homo = homographies[file_idx]
-                        seq_homos.append(_homo)
+                    # Flows
+                    if do_flow:
+
+                        if file_idx==0:
+                            _optical_flow = os.path.join(of_dir, filenames[file_idx+1][:-4] + '.npy')
+                            assert os.path.isfile(_optical_flow)
+                            seq_flows.append(_optical_flow)
+
+                        else:
+                            _optical_flow = os.path.join(of_dir, filename[:-4] + '.npy')
+                            assert os.path.isfile(_optical_flow)
+                            seq_flows.append(_optical_flow)
+
+
 
                 self.images.append(seq_images)
                 self.masks.append(seq_masks)
                 self.deblur_frames.append(seq_deblur_frames)
-                self.homos.append(seq_homos)
+                self.flows.append(seq_flows)
 
         # if seq_len is None:
         #     return
@@ -270,81 +280,12 @@ class MTL_TestDataset(data.Dataset):
         return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.masks[index]]
 
     def _load_homo(self, index):
-        return [np.load(path) for path in self.flows[index]]
-
-
-    def __len__(self):
-        return len(self.images)
-
-    def __str__(self):
-        return 'DST Multitask (split=' + str(self.split) + ')'
-
-
-
-class MTL_TestDatasetQual(data.Dataset):
-    """
-    NYUD dataset for multi-task learning.
-    Includes edge detection, semantic segmentation, surface normals, and depth prediction
-    """
-
-    def __init__(self, tasks,
-                 root='./DST-dataset/', split='train', seq_len=None, transform=None,
-                 meta=True, overfit=False):
-
-        self.root = root
-        self.transform = transform
-        self.meta = meta
-        self.split = split
-        # Images
-        self.images = []
-
-
-        dataset_dir = os.path.join(root, self.split)
-        for video in os.listdir(dataset_dir):
-            image_dir = os.path.join(dataset_dir, video, 'input')
-            filenames = sorted([x for x in os.listdir(image_dir) if '.jpg' in x], key=lambda x: int(os.path.basename(x)[:-4]))
-            if seq_len is None:
-                seq_len_inner = len(filenames)
-            else:
-                seq_len_inner = seq_len
-            for first_idx in range(0, len(filenames)-seq_len_inner+1, seq_len_inner):
-
-                seq_images, seq_masks, seq_deblur_frames, seq_homos = ([] for _ in range(4))
-
-                for file_idx in range(first_idx, first_idx + seq_len_inner):
-
-                    filename = filenames[file_idx]
-                    # Images
-                    _image = os.path.join(image_dir, filename)
-                    assert os.path.isfile(_image)
-                    seq_images.append(_image)
-
-                self.images.append(seq_images)
-
-        # Display stats
-        print('Number of {} dataset sequences: {:d}'.format(self.split, len(self.images)))
-
-
-    def __getitem__(self, index):
-
-        _img = self._load_img(index)
-        sample = {'image': _img}
-
-        if self.meta:
-            sample['meta'] = {'paths': self.images[index],
-                              'im_size': (_img[0].shape[0], _img[0].shape[1]),
-                              'transformations': {}}
-
-        if self.transform is not None:
-            sample = self.transform(sample)
-
-        return sample
-
-    def _load_img(self, index):
-        return [cv2.imread(path).astype(np.float32) for path in self.images[index]]
+        return [np.load(path).astype(np.float32) for path in self.flows[index]]
 
     def __len__(self):
         return len(self.images)
 
     def __str__(self):
         return 'DST Multitask (split=' + str(self.split) + ')'
+
+

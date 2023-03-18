@@ -50,20 +50,22 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
             [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
+
+            # import cv2
+            # cv2.imwrite('./frame-t-1.jpg', frames[0][0].permute(1, 2, 0).numpy() * 255.0)
+            # cv2.imwrite('./frame-t.jpg', frames[1][0].permute(1, 2, 0).numpy() * 255.0)
+            # cv2.imwrite('./mask-t.jpg', gt_dict['segment'][0].numpy() * 255.0)
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
             outputs = model(frames[0], frames[1], m2, d2)
+
+
+
             outputs = dict(zip(tasks, outputs))
             m2 = [x.detach() for x in outputs['segment']]
             d2 = [x.detach() for x in outputs['deblur']]
 
             losses = {task: losses_dict[task](outputs[task], gt_dict[task]) for task in tasks}
-
-            task_weights = {'segment': sum(losses.values()).detach() / (3 * losses['segment']).detach(),
-                            'deblur': sum(losses.values()).detach() / (3 * losses['deblur']).detach(),
-                            'flow': sum(losses.values()).detach() / (3 * losses['flow']).detach()}
-            losses = {task: losses[task] * task_weights[task] for task in tasks}
-
             loss = sum(losses.values())
             loss.backward()
             #torch.nn.utils.clip_grad_norm_(model.parameters(), 1) # added gradient clipping and normalization
@@ -157,7 +159,7 @@ def main(args):
     data = {split: MTL_Dataset(tasks, args.data_path, "train", args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
-    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=False, num_workers=1, pin_memory=True, drop_last=True)
               for split in ['train', 'val']}
 
 
