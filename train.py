@@ -1,7 +1,7 @@
 import os
 import torch
 import wandb
-
+import torchvision
 from argparse import ArgumentParser
 from utils.dataset import MTL_Dataset
 import torch.optim as optim
@@ -12,7 +12,7 @@ from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVerticalFlip, RandomColorChannel,\
     ColorJitter
-from utils.network_utils import model_save, model_load
+from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
 
 task_weights = {'segment': 0.0003,
@@ -107,32 +107,42 @@ def val(args, dataloader, model, metrics_dict, epoch):
             for frame in range(args.prev_frames, args.seq_len):
                 # Load the data and mount them on cuda
                 if frame == args.prev_frames:
-                    frames = [seq['image'][i].cuda(non_blocking=True) for i in range(frame + 1)]
-                    m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200), device='cuda'),
-                          torch.zeros((frames[0].shape[0], 2, 400, 400), device='cuda'),
-                          torch.zeros((frames[0].shape[0], 2, 800, 800),device='cuda')]
+                    frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
+                    m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200)),
+                          torch.zeros((frames[0].shape[0], 2, 400, 400)),
+                          torch.zeros((frames[0].shape[0], 2, 800, 800))]
                     d2 = [F.interpolate(seq['image'][0], scale_factor=0.25),
                           F.interpolate(seq['image'][0], scale_factor=0.5),
                           seq['image'][0]]
                 else:
-                    frames.append(seq['image'][frame].cuda(non_blocking=True))
+                    frames.append(seq['image'][frame].to(args.device))
                     del frames[0]
 
-                gt_dict = {task: seq[task][frame].cuda(non_blocking=True) if type(seq[task][frame]) is torch.Tensor else
-                [e.cuda(non_blocking=True) for e in seq[task][frame]] for task in tasks}
+                gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
+                [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
                 outputs = model(frames[0], frames[1], m2, d2)
                 outputs = dict(zip(tasks, outputs))
 
-                m2 = outputs['segment']
-                d2 = outputs['deblur']
-
                 task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
                 metrics_values = {k: v.item() for task in tasks for k, v in task_metrics[task].items()}
 
-
                 for metric in metrics:
                     metric_cumltive[metric].append(metrics_values[metric])
+
+                # visualize batch size (manually coded for 2)
+                i = 0
+                if seq_idx <= args.to_visualize:
+                    grids = [gridify(seq, outputs, d2, frame, batch_idx) for batch_idx in range(args.bs)]
+                    wandb.log({"image_{}_{}".format(i, frame): wandb.Image(grids[0])})
+                    wandb.log({"image_{}_{}".format(i+1, frame): wandb.Image(grids[1])})
+                    i += 2
+
+                m2 = outputs['segment']
+                d2 = outputs['deblur']
+
+
+
 
         metric_averages = {m: sum(metric_cumltive[m])/len(metric_cumltive[m]) for m in metrics}
         print("\n[VALIDATION] [EPOCH:{}/{}] {}\n".format(epoch, args.epochs,
@@ -154,19 +164,19 @@ def main(args):
                                                     ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
-    data = {split: MTL_Dataset(tasks, args.data_path, "train", args.seq_len, transform=transformations[split])
+    data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
     loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=False, num_workers=1, pin_memory=True, drop_last=True)
               for split in ['train', 'val']}
 
 
-    losses_dict = {
-        'segment': SemanticSegmentationLoss().to(args.device),
-        'deblur': DeblurringLoss().to(args.device),
-        'flow': OpticalFlowLoss().to(args.device)
-    }
-    losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
+    # losses_dict = {
+    #     'segment': SemanticSegmentationLoss().to(args.device),
+    #     'deblur': DeblurringLoss().to(args.device),
+    #     'flow': OpticalFlowLoss().to(args.device)
+    # }
+    # losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
 
     metrics_dict = {
         'segment': SegmentationMetrics().to(args.device),
@@ -197,7 +207,8 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    #wandb.login(key=['efc16996fea1e39d87a9589023b8e1c473b4cb2d'])
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -205,11 +216,11 @@ def main(args):
 
     for epoch in range(start_epoch, args.epochs+1):
 
-        train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
+        #train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
 
         val(args, loader['val'], model, metrics_dict, epoch)
 
-        model_save(model, optimizer, scheduler, epoch, args)
+        #model_save(model, optimizer, scheduler, epoch, args)
 
 
 if __name__ == '__main__':
@@ -226,6 +237,8 @@ if __name__ == '__main__':
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=2, type=int)
+
+    parser.add_argument('--to_visualize', dest='to_visualize', help='Number of mini seqs to visualize in validation', default=2, type=int)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")

@@ -3,12 +3,30 @@ import os
 import time
 
 import kornia
+from torchvision.utils import flow_to_image, make_grid
+
 
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters())
 
+def gridify(seq, outputs, d2, frame, batch_idx):
 
+    a = seq['image'][frame][batch_idx]*255.0 # input t
+    b = outputs['deblur'][2][batch_idx].clip(0, 1) * 255.0
+    c = seq['deblur'][frame][batch_idx]*255.0
+    d = seq['image'][frame-1][batch_idx]*255.0
+    e = (1 - torch.argmax(outputs['segment'][2][batch_idx], 0).repeat(3, 1, 1))*255.0
+    f = flow_to_image(outputs['flow'][2][batch_idx])
+    g = d2[2][batch_idx].clip(0, 1)*255.0
+    h = seq['segment'][frame][batch_idx].repeat(3, 1, 1)*255.0
+    i = flow_to_image(seq['flow'][frame][batch_idx].permute(2, 0, 1))
+    grid = make_grid([a,b,c,d,e,f,g,h,i], nrow=3, padding=20)
+    grid = torch.nn.functional.interpolate(grid.unsqueeze(0), scale_factor=.25).squeeze(0)
+    import cv2
+    cv2.imwrite('./here.png', cv2.cvtColor(grid.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB))
+
+    return cv2.cvtColor(grid.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
 
 def homo2offsets(homo, h, w):
     """
