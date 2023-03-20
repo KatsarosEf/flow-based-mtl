@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 import torch
 import wandb
 import torchvision
@@ -100,7 +102,8 @@ def val(args, dataloader, model, metrics_dict, epoch):
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
     metric_cumltive = {k: [] for k in metrics}
     model.eval()
-
+    videos2make = [[] for i in range(args.bs*args.to_visualize)]
+    i = 0
     with torch.no_grad():
 
         for seq_idx, seq in enumerate(dataloader):
@@ -108,12 +111,12 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 # Load the data and mount them on cuda
                 if frame == args.prev_frames:
                     frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                    m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200)),
-                          torch.zeros((frames[0].shape[0], 2, 400, 400)),
-                          torch.zeros((frames[0].shape[0], 2, 800, 800))]
-                    d2 = [F.interpolate(seq['image'][0], scale_factor=0.25),
-                          F.interpolate(seq['image'][0], scale_factor=0.5),
-                          seq['image'][0]]
+                    m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200)).to(args.device),
+                          torch.zeros((frames[0].shape[0], 2, 400, 400)).to(args.device),
+                          torch.zeros((frames[0].shape[0], 2, 800, 800)).to(args.device)]
+                    d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
+                          F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
+                          seq['image'][0].to(args.device)]
                 else:
                     frames.append(seq['image'][frame].to(args.device))
                     del frames[0]
@@ -131,18 +134,18 @@ def val(args, dataloader, model, metrics_dict, epoch):
                     metric_cumltive[metric].append(metrics_values[metric])
 
                 # visualize batch size (manually coded for 2)
-                i = 0
+
                 if seq_idx <= args.to_visualize:
-                    grids = [gridify(seq, outputs, d2, frame, batch_idx) for batch_idx in range(args.bs)]
-                    wandb.log({"image_{}_{}".format(i, frame): wandb.Image(grids[0])})
-                    wandb.log({"image_{}_{}".format(i+1, frame): wandb.Image(grids[1])})
-                    i += 2
+                    grids = [gridify(args, seq, outputs, d2, frame, batch_idx) for batch_idx in range(args.bs)]
+                    videos2make[i].append(grids[0])
+                    videos2make[i+1].append(grids[1])
 
                 m2 = outputs['segment']
                 d2 = outputs['deblur']
 
-
-
+            # Add the end of the small, 5-frame, sequences, log the videos, 2xvideos per batch
+            [wandb.log({"video_{}".format(idx): wandb.Video(np.stack((videos2make[idx])).transpose((0,3,1,2)).astype(np.uint8), fps=1)}) for idx in range(0+i, i+2)]
+            i += 2
 
         metric_averages = {m: sum(metric_cumltive[m])/len(metric_cumltive[m]) for m in metrics}
         print("\n[VALIDATION] [EPOCH:{}/{}] {}\n".format(epoch, args.epochs,
@@ -207,7 +210,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -215,11 +218,11 @@ def main(args):
 
     for epoch in range(start_epoch, args.epochs+1):
 
-        train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
+        #train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
 
         val(args, loader['val'], model, metrics_dict, epoch)
 
-        model_save(model, optimizer, scheduler, epoch, args)
+        #model_save(model, optimizer, scheduler, epoch, args)
 
 
 if __name__ == '__main__':
