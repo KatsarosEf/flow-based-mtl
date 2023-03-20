@@ -134,8 +134,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
                     metric_cumltive[metric].append(metrics_values[metric])
 
                 # visualize batch size (manually coded for 2)
-
-                if seq_idx <= args.to_visualize:
+                if seq_idx < args.to_visualize:
                     grids = [gridify(args, seq, outputs, d2, frame, batch_idx) for batch_idx in range(args.bs)]
                     videos2make[i].append(grids[0])
                     videos2make[i+1].append(grids[1])
@@ -144,8 +143,9 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 d2 = outputs['deblur']
 
             # Add the end of the small, 5-frame, sequences, log the videos, 2xvideos per batch
-            [wandb.log({"video_{}".format(idx): wandb.Video(np.stack((videos2make[idx])).transpose((0,3,1,2)).astype(np.uint8), fps=1)}) for idx in range(0+i, i+2)]
-            i += 2
+            if seq_idx < args.to_visualize:
+                [wandb.log({"video_{}".format(idx): wandb.Video(np.stack((videos2make[idx])).transpose((0,3,1,2)).astype(np.uint8), fps=1)}) for idx in range(0+i, i+2)]
+                i += 2
 
         metric_averages = {m: sum(metric_cumltive[m])/len(metric_cumltive[m]) for m in metrics}
         print("\n[VALIDATION] [EPOCH:{}/{}] {}\n".format(epoch, args.epochs,
@@ -210,7 +210,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
