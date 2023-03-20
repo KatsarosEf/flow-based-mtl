@@ -17,9 +17,9 @@ from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVe
 from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
 
-task_weights = {'segment': 0.0003,
-                'deblur': 0.0003,
-                'flow': 1.2}
+task_weights = {'segment': 1,
+                'deblur': 1,
+                'flow': 1}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
@@ -210,7 +210,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -218,7 +218,7 @@ def main(args):
 
     for epoch in range(start_epoch, args.epochs+1):
 
-        #train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
+        train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
 
         val(args, loader['val'], model, metrics_dict, epoch)
 
@@ -238,7 +238,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
-    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=2, type=int)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
 
     parser.add_argument('--to_visualize', dest='to_visualize', help='Number of mini seqs to visualize in validation', default=2, type=int)
 
@@ -248,7 +248,7 @@ if __name__ == '__main__':
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
 
     parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)
-    parser.add_argument('--bs', help='Set size of the batch size', default=2, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
