@@ -1,13 +1,13 @@
 scikit-image==0.18.1
 #mmcv-full
 scipy==1.6.0
-#torch==1.7.1
-torchvision==0.8.2
+#torch==1.12.1
+#torchvision==0.8.2
 matplotlib
 opencv-python
 argparse
 tensorboardX==2.1
-kornia==0.5.10
+#kornia==0.5.10
 packaging==21.0
 torchmetrics==0.5.1
 tqdm==4.62.2
@@ -15,4 +15,3 @@ wandb
 #tensorboard==2.6.0
 #fvcore==0.1.5.post20210915
 #pytorch-lightning==1.2.9
-

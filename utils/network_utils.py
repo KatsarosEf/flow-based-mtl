@@ -4,7 +4,7 @@ import time
 
 import kornia
 from torchvision.utils import flow_to_image, make_grid
-
+import torch.nn.functional as F
 
 
 def count_parameters(model):
@@ -22,49 +22,40 @@ def gridify(seq, outputs, d2, frame, batch_idx):
     h = seq['segment'][frame][batch_idx].repeat(3, 1, 1)*255.0
     i = flow_to_image(seq['flow'][frame][batch_idx].permute(2, 0, 1))
     grid = make_grid([a,b,c,d,e,f,g,h,i], nrow=3, padding=20)
-    grid = torch.nn.functional.interpolate(grid.unsqueeze(0), scale_factor=.25).squeeze(0)
+    grid = F.interpolate(grid.unsqueeze(0), scale_factor=.25).squeeze(0)
+
     import cv2
     cv2.imwrite('./here.png', cv2.cvtColor(grid.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB))
 
     return cv2.cvtColor(grid.permute(1,2,0).numpy(), cv2.COLOR_BGR2RGB)
 
-def homo2offsets(homo, h, w):
+def warp_flow(x, flo):
     """
-
-    Args:
-        homo: Torch.Tensor [B, 3, 3]
-        h: Int, height
-        w: Int, width
-
-    Returns:
-        offsets: [B, 4, 2]
+    warp an image/tensor (im2) back to im1, according to the optical flow
+    x: [B, C, H, W] (im2)
+    flo: [B, 2, H, W] flow
     """
-    corners = torch.tensor([[0, 0, 1], [w, 0, 1], [0, h, 1], [w, h, 1]]).float()
-    offsets = torch.stack([torch.matmul(h, corners.T)[:2].T for h in homo])
-    offsets = offsets - corners.unsqueeze(0)[:, :, :2]
-    return offsets
+    B, C, H, W = x.size()
+    # mesh grid
+    xx = torch.arange(0, W).view(1,-1).repeat(H,1)
+    yy = torch.arange(0, H).view(-1,1).repeat(1,W)
+    xx = xx.view(1,1,H,W).repeat(B,1,1,1)
+    yy = yy.view(1,1,H,W).repeat(B,1,1,1)
+    grid = torch.cat((xx,yy),1).float()
 
+    if x.is_cuda:
+        grid = grid.cuda()
+    vgrid = grid + flo
 
-def offsets2homo(offsets, h, w):
-    """
+    # scale grid to [-1,1]
+    vgrid[:,0,:,:] = 2.0*vgrid[:,0,:,:].clone() / max(W-1,1)-1.0
+    vgrid[:,1,:,:] = 2.0*vgrid[:,1,:,:].clone() / max(H-1,1)-1.0
 
-    Args:
-        offsets: offsets computed by network [B, 8]
-        h: height of mask
-        w: width of mask
+    vgrid = vgrid.permute(0,2,3,1)
 
-    Returns:
-        homography matrix [B, 3, 3]
-    """
-    corners = torch.tensor([[[0, 0], [w, 0], [0, h], [w, h]]]).float()
-    offsets = offsets.view(offsets.shape[0], 4, 2)
-    offsets = corners + offsets
-    homo = kornia.geometry.transform.get_perspective_transform(corners.repeat(offsets.shape[0], 1, 1), offsets)
-    return homo
+    output = F.grid_sample(x, vgrid, align_corners=True)
 
-def warp_flow(input, flow, size):
-    return input
-
+    return output
 
 def model_save(model, optimizer, scheduler, epoch, args, save_best=False):
 

@@ -22,6 +22,7 @@ os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
 
+
 def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_dict, epoch):
     tasks = model.module.tasks
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
@@ -57,7 +58,6 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
             outputs = model(frames[0], frames[1], m2, d2)
-
 
 
             outputs = dict(zip(tasks, outputs))
@@ -171,12 +171,12 @@ def main(args):
               for split in ['train', 'val']}
 
 
-    # losses_dict = {
-    #     'segment': SemanticSegmentationLoss().to(args.device),
-    #     'deblur': DeblurringLoss().to(args.device),
-    #     'flow': OpticalFlowLoss().to(args.device)
-    # }
-    # losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
+    losses_dict = {
+        'segment': SemanticSegmentationLoss().to(args.device),
+        'deblur': DeblurringLoss().to(args.device),
+        'flow': OpticalFlowLoss().to(args.device)
+    }
+    losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
 
     metrics_dict = {
         'segment': SegmentationMetrics().to(args.device),
@@ -187,7 +187,7 @@ def main(args):
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = VideoMIMOUNet(tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
+    model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
     # params, fps, flops = measure_efficiency(args)
     # print(params, fps, flops)
 
@@ -207,8 +207,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    #wandb.login(key=['efc16996fea1e39d87a9589023b8e1c473b4cb2d'])
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -216,22 +215,22 @@ def main(args):
 
     for epoch in range(start_epoch, args.epochs+1):
 
-        #train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
+        train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
 
         val(args, loader['val'], model, metrics_dict, epoch)
 
-        #model_save(model, optimizer, scheduler, epoch, args)
+        model_save(model, optimizer, scheduler, epoch, args)
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
-    parser.add_argument("--device", dest='device', default="cpu", type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
+    # parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
 
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
-    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+    parser.add_argument("--device", dest='device', default="cuda", type=str)
 
 
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)

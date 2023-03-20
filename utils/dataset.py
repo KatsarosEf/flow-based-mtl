@@ -81,12 +81,10 @@ class MTL_Dataset(data.Dataset):
 
                     # Flows
                     if do_flow:
-
                         if file_idx==0:
                             _optical_flow = os.path.join(of_dir, filenames[file_idx+1][:-4] + '.npy')
                             assert os.path.isfile(_optical_flow)
                             seq_flows.append(_optical_flow)
-
                         else:
                             _optical_flow = os.path.join(of_dir, filename[:-4] + '.npy')
                             assert os.path.isfile(_optical_flow)

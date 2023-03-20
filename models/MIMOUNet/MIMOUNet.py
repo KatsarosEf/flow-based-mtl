@@ -5,7 +5,7 @@ from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
 class ContractingBlock(nn.Module):
-    def __init__(self, block, nr_blocks=2):
+    def __init__(self, args, block, nr_blocks=2):
         super(ContractingBlock, self).__init__()
         base_channel = 32
 
@@ -39,7 +39,7 @@ class ContractingBlock(nn.Module):
         return x, f
 
 class ExpandingBlock(nn.Module):
-    def __init__(self, block, nr_blocks=2):
+    def __init__(self, args, block, nr_blocks=2):
         super(ExpandingBlock, self).__init__()
         base_channel = 32
 
@@ -111,9 +111,9 @@ class ExpandingBlock(nn.Module):
         off4_up = F.interpolate(off4, scale_factor=2)
         outputsOF.append(off4)
 
-        wf2_2 = warp_flow(f2_2, off4_up, (400, 400))
-        wm2_2 = warp_flow(m2_2, off4_up, (400, 400))
-        wd2_2 = warp_flow(d2_2, off4_up, (400, 400))
+        wf2_2 = warp_flow(f2_2, off4_up)
+        wm2_2 = warp_flow(m2_2, off4_up)
+        wd2_2 = warp_flow(d2_2, off4_up)
 
         ################################ SCALE 2 ######################################
 
@@ -128,16 +128,16 @@ class ExpandingBlock(nn.Module):
 
         ### Segmentation
         m1_4_up = F.interpolate(m1_4, scale_factor=2)
-        m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up], 1)) #CHANGES HAPPENED HERE
+        m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up], 1)) + m1_4_up
         outputsS.append(m1_2)
 
         ### Homography
         off2 = self.homoEst2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
         off2_up = F.interpolate(off2, scale_factor=2)
         outputsOF.append(off2)
-        wf2_1 = warp_flow(f2_1, off2_up, (800, 800))
-        wm2_1 = warp_flow(m2_1, off2_up, (800, 800))
-        wd2_1 = warp_flow(d2_1, off2_up, (800, 800))
+        wf2_1 = warp_flow(f2_1, off2_up)
+        wm2_1 = warp_flow(m2_1, off2_up)
+        wd2_1 = warp_flow(d2_1, off2_up)
 
         ################################ SCALE 1 ######################################
 
@@ -152,7 +152,7 @@ class ExpandingBlock(nn.Module):
 
         ### Segmentation
         m1_2_up = F.interpolate(m1_2, scale_factor=2)
-        m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up], 1)) #CHANGES HAPPENED HERE
+        m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up], 1)) + m1_2_up
         outputsS.append(m1_1)
 
         ### Homography
@@ -162,11 +162,12 @@ class ExpandingBlock(nn.Module):
         return [outputsS, outputsD, outputsOF]
 
 class VideoMIMOUNet(nn.Module):
-    def __init__(self, tasks, block, nr_blocks):
+    def __init__(self, args, tasks, block, nr_blocks):
         super(VideoMIMOUNet, self).__init__()
         self.tasks = tasks
-        self.encoder = ContractingBlock(block, nr_blocks)
-        self.decoder = ExpandingBlock(block, 2)
+        self.encoder = ContractingBlock(args, block, nr_blocks).to(args.device)
+        self.decoder = ExpandingBlock(args, block, 2).to(args.device)
+        self.args = args
 
     def forward_inference(self, x2, x1, m2, d2):
         x1, f1 = self.encoder(x1)
