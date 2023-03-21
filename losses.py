@@ -5,18 +5,18 @@ import torch.nn.functional as F
 
 class SemanticSegmentationLoss(nn.Module):
 
-	def __init__(self, gamma, ce_factor=1, device='cuda'):
+	def __init__(self, args, ce_factor=1, device='cuda'):
 		super(SemanticSegmentationLoss, self).__init__()
 		self.cross_entropy_loss = nn.CrossEntropyLoss(reduction='mean').to(device)
 		self.ce_factor = ce_factor
-		self.gamma = gamma
+		self.gamma = args.gamma
 
 	def forward(self, output, gt):
 		if type(output) is list:
 			losses = []
 			for num, elem in enumerate(output[::-1]):
 				losses.append(self.cross_entropy_loss(elem, nn.functional.interpolate(gt.float().unsqueeze(1), scale_factor=1.0/(2**num)).long().squeeze(1)))
-			cross_entropy_loss = sum(losses)
+			cross_entropy_loss = sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))])
 		else:
 			cross_entropy_loss = self.cross_entropy_loss(output, gt)
 		return self.ce_factor * cross_entropy_loss
@@ -78,13 +78,13 @@ class CharbonnierLoss(nn.Module):
 
 class DeblurringLoss(nn.Module):
 
-	def __init__(self, gamma, CL_factor=1, device='cuda', sobel=False):
+	def __init__(self, args, CL_factor=1, device='cuda', sobel=False):
 
 		super(DeblurringLoss, self).__init__()
 		self.sobel = sobel
+		self.gamma = args.gamma
 		self.CL_factor = CL_factor
-		self.CL = ContentLoss(mode='charbonnier').to(device)
-		self.gamma = gamma
+		self.CL = ContentLoss(gamma=self.gamma, mode='charbonnier').to(device)
 		if sobel:
 			self.E_factor = 1
 			self.EL = MSEdgeLoss().to(device)
@@ -100,9 +100,10 @@ class DeblurringLoss(nn.Module):
 
 class ContentLoss(nn.Module):
 
-	def __init__(self, mode='charbonnier', device='cuda'):
+	def __init__(self, gamma, mode='charbonnier', device='cuda'):
 
 		super(ContentLoss, self).__init__()
+		self.gamma = gamma
 		if mode == 'l2':
 			self.loss_function = nn.MSELoss(reduction='mean').to(device)
 		elif mode == 'l1':
@@ -115,34 +116,36 @@ class ContentLoss(nn.Module):
 			losses = []
 			for num, elem in enumerate(output[::-1]):
 				losses.append(self.loss_function(elem, torch.nn.functional.interpolate(gt, scale_factor=1.0/(2**num))))
-			loss = sum(losses)
+			loss =  sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))])
 		else:
 			loss = self.loss_function(output, gt)
 		return loss
 
 class EPELoss(nn.Module):
 
-	def __init__(self):
+	def __init__(self, args):
 		super(EPELoss, self).__init__()
 		self.eps = 1e-6
+		self.max_flow = args.max_flow
 
 	def forward(self, flow_pred, flow_gt):
-		return torch.mean(torch.sqrt((flow_pred - flow_gt)**2 + self.eps))
+		return torch.mean((flow_pred[flow_gt.abs()<self.max_flow] - flow_gt[flow_gt.abs()<self.max_flow]).abs() + self.eps)
 
 
 class OpticalFlowLoss(nn.Module):
 
-	def __init__(self, gamma, device='cuda'):
+	def __init__(self, args, device='cuda'):
 		super(OpticalFlowLoss, self).__init__()
-		self.EPELoss = EPELoss().to(device)
-		self.gamma = gamma
+		self.args = args
+		self.EPELoss = EPELoss(self.args).to(device)
+		self.gamma = args.gamma
 
 	def forward(self, output, gt):
 		if type(output) is list:
 			losses = []
 			for num, elem in enumerate(output[::-1]):
 				losses.append(self.EPELoss(elem, torch.nn.functional.interpolate(gt.permute(0,3,1,2), scale_factor=1.0/(2**num))))
-			EPELoss = sum(losses)
+			EPELoss =  sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))])
 		else:
 			EPELoss = self.EPELoss(output, gt)
 		return EPELoss
