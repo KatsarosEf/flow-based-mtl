@@ -69,7 +69,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             losses = {task: losses_dict[task](outputs[task], gt_dict[task]) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
-            #torch.nn.utils.clip_grad_norm_(model.parameters(), 1) # added gradient clipping and normalization
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip) # added gradient clipping and normalization
             optimizer.step()
 
             print('[TRAIN] [EPOCH:{}/{} ] [SEQ: {}/{}] Total Loss: {:.4f}\t{}'.format(epoch, args.epochs, seq_num+1, len(dataloader), loss, '\t'.join(
@@ -170,14 +170,14 @@ def main(args):
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
-    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=False, num_workers=1, pin_memory=True, drop_last=True)
+    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
               for split in ['train', 'val']}
 
 
     losses_dict = {
-        'segment': SemanticSegmentationLoss().to(args.device),
-        'deblur': DeblurringLoss().to(args.device),
-        'flow': OpticalFlowLoss().to(args.device)
+        'segment': SemanticSegmentationLoss(args.gamma).to(args.device),
+        'deblur': DeblurringLoss(args.gamma).to(args.device),
+        'flow': OpticalFlowLoss(args.gamma).to(args.device)
     }
     losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
 
@@ -195,6 +195,7 @@ def main(args):
     # print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
+    optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
@@ -210,7 +211,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -233,27 +234,29 @@ if __name__ == '__main__':
 
     parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
     parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
-    parser.add_argument("--device", dest='device', default="cuda", type=str)
 
-
-    parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
-
-    parser.add_argument('--to_visualize', dest='to_visualize', help='Number of mini seqs to visualize in validation', default=2, type=int)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
     parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
-    parser.add_argument("--resume", action='store_true', help="Flag for resume training")
 
-    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)
-    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
+    parser.add_argument('--wdecay', type=float, default=.00005)
+    parser.add_argument('--epsilon', type=float, default=1e-8)
+    parser.add_argument('--clip', type=float, default=1.0)
+    parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
+    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
+    parser.add_argument("--device", dest='device', default="cuda", type=str)
 
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
+    parser.add_argument("--resume", action='store_true', help="Flag for resume training")
+    parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
+    parser.add_argument('--to_visualize', dest='to_visualize', help='Number of mini seqs to visualize in validation', default=2, type=int)
 
 
     args = parser.parse_args()

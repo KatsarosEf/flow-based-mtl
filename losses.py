@@ -5,10 +5,11 @@ import torch.nn.functional as F
 
 class SemanticSegmentationLoss(nn.Module):
 
-	def __init__(self, ce_factor=1, device='cuda'):
+	def __init__(self, gamma, ce_factor=1, device='cuda'):
 		super(SemanticSegmentationLoss, self).__init__()
 		self.cross_entropy_loss = nn.CrossEntropyLoss(reduction='mean').to(device)
 		self.ce_factor = ce_factor
+		self.gamma = gamma
 
 	def forward(self, output, gt):
 		if type(output) is list:
@@ -77,12 +78,13 @@ class CharbonnierLoss(nn.Module):
 
 class DeblurringLoss(nn.Module):
 
-	def __init__(self, CL_factor=1, device='cuda', sobel=False):
+	def __init__(self, gamma, CL_factor=1, device='cuda', sobel=False):
 
 		super(DeblurringLoss, self).__init__()
 		self.sobel = sobel
 		self.CL_factor = CL_factor
 		self.CL = ContentLoss(mode='charbonnier').to(device)
+		self.gamma = gamma
 		if sobel:
 			self.E_factor = 1
 			self.EL = MSEdgeLoss().to(device)
@@ -118,32 +120,6 @@ class ContentLoss(nn.Module):
 			loss = self.loss_function(output, gt)
 		return loss
 
-class MaceLoss(nn.Module):
-
-	def __init__(self):
-		super(MaceLoss, self).__init__()
-		self.eps = 1e-6
-
-	def forward(self, X, Y):
-		return ((X - Y) ** 2 + self.eps).sum(dim=2).sqrt().mean()
-
-
-class HomographyLoss(nn.Module):
-	def __init__(self, device='cuda'):
-		super(HomographyLoss, self).__init__()
-		self.MaceLoss = MaceLoss().to(device)
-
-	def forward(self, output, gt):
-		if type(output) is list:
-			losses = []
-			for num, elem in enumerate(output[::-1]):
-				losses.append(self.MaceLoss(elem, gt[1] / (2**num)))
-			MaceLoss = sum(losses)
-		else:
-			MaceLoss = self.MaceLoss(output, gt)
-		return MaceLoss
-
-
 class EPELoss(nn.Module):
 
 	def __init__(self):
@@ -156,9 +132,10 @@ class EPELoss(nn.Module):
 
 class OpticalFlowLoss(nn.Module):
 
-	def __init__(self, device='cuda'):
+	def __init__(self, gamma, device='cuda'):
 		super(OpticalFlowLoss, self).__init__()
 		self.EPELoss = EPELoss().to(device)
+		self.gamma = gamma
 
 	def forward(self, output, gt):
 		if type(output) is list:
