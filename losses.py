@@ -24,7 +24,7 @@ class SemanticSegmentationLoss(nn.Module):
 class EdgeLoss(nn.Module):
 
 	def __init__(self):
-		super(EdgeLoss, self).__init__()
+		super(EdgeLoss, args, self).__init__()
 		k = torch.Tensor([[.05, .25, .4, .25, .05]])
 		self.kernel = torch.matmul(k.t(),k).unsqueeze(0).repeat(3,1,1,1)
 		if torch.cuda.is_available():
@@ -51,9 +51,9 @@ class EdgeLoss(nn.Module):
 
 class MSEdgeLoss(nn.Module):
 
-	def __init__(self, device='cuda'):
+	def __init__(self, args, device='cuda'):
 		super(MSEdgeLoss, self).__init__()
-		self.loss_function = EdgeLoss().to(device)
+		self.loss_function = EdgeLoss(args).to(device)
 
 	def forward(self, output, gt):
 		if type(output) is list:
@@ -64,7 +64,6 @@ class MSEdgeLoss(nn.Module):
 		else:
 			loss = self.loss_function(output, gt)
 		return loss
-
 
 class CharbonnierLoss(nn.Module):
 
@@ -145,7 +144,7 @@ class OpticalFlowLoss(nn.Module):
 			losses = []
 			for num, elem in enumerate(output[::-1]):
 				losses.append(self.EPELoss(elem, torch.nn.functional.interpolate(gt, scale_factor=1.0/(2**num))))
-			EPELoss =  sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))])
+			EPELoss = sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))])
 		else:
 			EPELoss = self.EPELoss(output, gt)
 		return EPELoss

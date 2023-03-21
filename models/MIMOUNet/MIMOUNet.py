@@ -111,9 +111,9 @@ class ExpandingBlock(nn.Module):
         off4_up = F.interpolate(off4, scale_factor=2)
         outputsOF.append(off4)
 
-        wf2_2 = warp_flow(f2_2, off4_up)
-        wm2_2 = warp_flow(m2_2, off4_up)
-        wd2_2 = warp_flow(d2_2, off4_up)
+        wf2_2 = warp_flow(f2_2, off4_up / 2.0)
+        wm2_2 = warp_flow(m2_2, off4_up / 2.0)
+        wd2_2 = warp_flow(d2_2, off4_up / 2.0)
 
         ################################ SCALE 2 ######################################
 
