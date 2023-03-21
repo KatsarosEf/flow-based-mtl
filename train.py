@@ -19,7 +19,7 @@ import torch.nn.functional as F
 
 task_weights = {'segment': 0.1,
                 'deblur': 1,
-                'flow': 1}
+                'flow': 0.1}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
@@ -69,7 +69,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             losses = {task: losses_dict[task](outputs[task], gt_dict[task]) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip) # added gradient clipping and normalization
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             optimizer.step()
 
             print('[TRAIN] [EPOCH:{}/{} ] [SEQ: {}/{}] Total Loss: {:.4f}\t{}'.format(epoch, args.epochs, seq_num+1, len(dataloader), loss, '\t'.join(
@@ -209,7 +209,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 

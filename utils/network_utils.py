@@ -21,11 +21,11 @@ def gridify(args, seq, outputs, d2, frame, batch_idx):
     b = outputs['deblur'][2][batch_idx].clip(0, 1) * 255.0
     c = seq_cpu['deblur'][frame][batch_idx]*255.0
     d = seq_cpu['image'][frame-1][batch_idx]*255.0
-    e = torch.argmax(outputs['segment'][2][batch_idx].repeat(3, 1, 1))*255.0
+    e = torch.argmax(outputs['segment'][2][batch_idx], 0).repeat(3, 1, 1)*255.0
     f = seq_cpu['segment'][frame][batch_idx].repeat(3, 1, 1)*255.0
     g = d2[2][batch_idx].clip(0, 1)*255.0
     h = flow_to_image(outputs['flow'][2][batch_idx])
-    i = flow_to_image(seq_cpu['flow'][frame][batch_idx].permute(2, 0, 1))
+    i = flow_to_image(seq_cpu['flow'][frame][batch_idx])
     grid = make_grid([a,b,c,d,e,f,g,h,i], nrow=3, padding=20)
     grid = F.interpolate(grid.unsqueeze(0), scale_factor=.35).squeeze(0)
 
