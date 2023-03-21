@@ -17,7 +17,7 @@ from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVe
 from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
 
-task_weights = {'segment': 1,
+task_weights = {'segment': 0.1,
                 'deblur': 1,
                 'flow': 1}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
@@ -69,7 +69,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             losses = {task: losses_dict[task](outputs[task], gt_dict[task]) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
-            #torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip) # added gradient clipping and normalization
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip) # added gradient clipping and normalization
             optimizer.step()
 
             print('[TRAIN] [EPOCH:{}/{} ] [SEQ: {}/{}] Total Loss: {:.4f}\t{}'.format(epoch, args.epochs, seq_num+1, len(dataloader), loss, '\t'.join(
@@ -241,9 +241,9 @@ if __name__ == '__main__':
     parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
 
     parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
-    parser.add_argument('--wdecay', type=float, default=.00005)
+    parser.add_argument('--wdecay', type=float, default=.0005)
     parser.add_argument('--epsilon', type=float, default=1e-8)
-    parser.add_argument('--clip', type=float, default=1.0)
+    parser.add_argument('--clip', type=float, default=0.8)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
     parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
