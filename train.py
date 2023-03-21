@@ -161,10 +161,8 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([
-                                                    # RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
-                                                    # RandomVerticalFlip(),
-                                                    ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
+                                                    RandomVerticalFlip(), ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
