@@ -143,7 +143,7 @@ class OpticalFlowLoss(nn.Module):
 		if type(output) is list:
 			losses = []
 			for num, elem in enumerate(output[::-1]):
-				losses.append(self.EPELoss(elem, torch.nn.functional.interpolate(gt, scale_factor=1.0/(2**num))))
+				losses.append(self.EPELoss(elem, torch.nn.functional.interpolate(gt/(2**num), scale_factor=1.0/(2**num))))
 			EPELoss = sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))])
 		else:
 			EPELoss = self.EPELoss(output, gt)

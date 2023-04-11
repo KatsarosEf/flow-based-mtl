@@ -251,7 +251,7 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.8)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=1, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=100, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
