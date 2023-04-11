@@ -1,6 +1,5 @@
 from models.MIMOUNet.layers import *
 from models.HomoEstimator import HomoEstimator, HomoEstimator2, HomoEstimator4
-import kornia
 from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
@@ -43,13 +42,9 @@ class ExpandingBlock(nn.Module):
         super(ExpandingBlock, self).__init__()
         base_channel = 32
 
-        self.scale_homo = torch.eye(3)
-        self.scale_homo[0, 0] = 2
-        self.scale_homo[1, 1] = 2
-
-        self.homoEst4 = HomoEstimator4()
-        self.homoEst2 = HomoEstimator2()
-        self.homoEst = HomoEstimator()
+        self.of_est4 = HomoEstimator4()
+        self.of_est2 = HomoEstimator2()
+        self.of_est = HomoEstimator()
 
         self.Decoder = nn.ModuleList([
             DBlock(base_channel * 4, 2, name=block),
@@ -107,7 +102,7 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_4)
 
         ### Flow
-        off4 = self.homoEst4(self.FAH[0](f1_4, m1_4, d1_4), self.FAH[0](f2_4, m2_4, d2_4))
+        off4 = self.of_est4(self.FAH[0](f1_4, m1_4, d1_4), self.FAH[0](f2_4, m2_4, d2_4))
         off4_up = F.interpolate(off4, scale_factor=2)
         outputsOF.append(off4)
 
@@ -132,7 +127,7 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_2)
 
         ### Homography
-        off2 = self.homoEst2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
+        off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
         off2_up = F.interpolate(off2, scale_factor=2)
         outputsOF.append(off2)
         wf2_1 = warp_flow(f2_1, off2_up)
@@ -156,7 +151,7 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_1)
 
         ### Homography
-        off1 = self.homoEst(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1)) + off2_up
+        off1 = self.of_est(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1)) + off2_up
         outputsOF.append(off1)
 
         return [outputsS, outputsD, outputsOF]
@@ -186,36 +181,64 @@ class VideoMIMOUNet(nn.Module):
 if __name__ == "__main__":
     import torch
     import time
-    import os
-    from utils.network_utils import model_load
-
+    from argparse import ArgumentParser
+    device = 'cpu'
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters())
 
 
-    load_model_path = os.path.join('../../resume', 'ckpt_100.pth')
-    model = VideoMIMOUNet(['segment', 'deblur', 'flow'], nr_blocks=5, block='fft').to(args.device)
-    model = torch.nn.DataParallel(model).to(args.device)
-    _ = model_load(load_model_path, model)
+    parser = ArgumentParser(description='Parser of Training Arguments')
 
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
+    # parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
+
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='./debug-ecai-mtl', type=str)
+
+    parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
+
+    parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
+    parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
+    parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
+
+    parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
+    parser.add_argument('--wdecay', type=float, default=.0005)
+    parser.add_argument('--epsilon', type=float, default=1e-8)
+    parser.add_argument('--clip', type=float, default=0.8)
+    parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
+    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
+    parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
+    parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=100, type=int)
+    parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
+    parser.add_argument("--device", dest='device', default="cpu", type=str)
+
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)
+    parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
+    parser.add_argument("--resume", action='store_true', help="Flag for resume training")
+    parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
+    parser.add_argument('--to_visualize', dest='to_visualize', help='Number of mini seqs to visualize in validation', default=2, type=int)
+    args = parser.parse_args()
+
+    model = VideoMIMOUNet(args, ['segment', 'deblur', 'flow'], nr_blocks=5, block='res').to(device)
 
 
     dims = 800, 800
-    x1, x2 = [torch.randn((1, 3, *dims)).cuda(non_blocking=True), torch.randn((1, 3, *dims)).cuda(non_blocking=True)]
-    m2 = [torch.rand((x1.shape[0], 2, 200, 200), device='cuda'),
-          torch.rand((x1.shape[0], 2, 400, 400), device='cuda'),
-          torch.rand((x1.shape[0], 2, 800, 800), device='cuda')]
-    d2 = [torch.rand((x1.shape[0], 3, 200, 200), device='cuda'),
-          torch.rand((x1.shape[0], 3, 400, 400), device='cuda'),
-          torch.rand((x1.shape[0], 3, 800, 800), device='cuda')]
+    x1, x2 = [torch.randn((1, 3, *dims)).to(device), torch.randn((1, 3, *dims)).to(device)]
+    m2 = [torch.rand((x1.shape[0], 2, 200, 200), device=device),
+          torch.rand((x1.shape[0], 2, 400, 400), device=device),
+          torch.rand((x1.shape[0], 2, 800, 800), device=device)]
+    d2 = [torch.rand((x1.shape[0], 3, 200, 200), device=device),
+          torch.rand((x1.shape[0], 3, 400, 400), device=device),
+          torch.rand((x1.shape[0], 3, 800, 800), device=device)]
 
     times = []
     with torch.no_grad():
         for i in range(60):
-            torch.cuda.synchronize()
+            #torch.cuda.synchronize()
             test_time_start = time.time()
-            _ = model.module.forward_inference(x1, x2, m2, d2)
-            torch.cuda.synchronize()
+            _ = model.forward_inference(x1, x2, m2, d2)
+            #torch.cuda.synchronize()
             times.append(time.time() - test_time_start)
 
     fps = round(1 / (sum(times[30:])/len(times[30:])), 2)

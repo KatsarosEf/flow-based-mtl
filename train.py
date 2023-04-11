@@ -3,6 +3,8 @@ import os
 import numpy as np
 import torch
 import wandb
+from utils.network_utils import warp_flow
+
 import torchvision
 from argparse import ArgumentParser
 from utils.dataset import MTL_Dataset
@@ -53,10 +55,12 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
             [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
-            # import cv2
-            # cv2.imwrite('./frame-t-1.jpg', frames[0][0].permute(1, 2, 0).numpy() * 255.0)
-            # cv2.imwrite('./frame-t.jpg', frames[1][0].permute(1, 2, 0).numpy() * 255.0)
-            # cv2.imwrite('./mask-t.jpg', gt_dict['segment'][0].numpy() * 255.0)
+            import cv2
+            # idx = 4
+            # cv2.imwrite('./frame-t-1.jpg', frames[0][idx].permute(1, 2, 0).numpy() * 255.0)
+            # cv2.imwrite('./frame-t.jpg', frames[1][idx].permute(1, 2, 0).numpy() * 255.0)
+            # cv2.imwrite('./mask-t.jpg', gt_dict['segment'][idx].numpy() * 255.0)
+            # cv2.imwrite('./warped.jpg', warp_flow(frames[0][idx].unsqueeze(0), gt_dict['flow'][idx])[0].cpu().permute(1,2,0).numpy()*255.0)
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
             outputs = model(frames[0], frames[1], m2, d2)
@@ -161,8 +165,10 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
-                                                    RandomVerticalFlip(), ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([
+                                                    # RandomColorChannel(), ColorJitter(),
+                                                    # RandomHorizontalFlip(), RandomVerticalFlip(),
+                                                    ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
@@ -209,7 +215,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-ecai', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -230,8 +236,8 @@ if __name__ == '__main__':
     # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
     # parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='./debug-ecai-mtl', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
@@ -249,7 +255,7 @@ if __name__ == '__main__':
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=100, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
-    parser.add_argument("--device", dest='device', default="cuda", type=str)
+    parser.add_argument("--device", dest='device', default="cpu", type=str)
 
     parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)

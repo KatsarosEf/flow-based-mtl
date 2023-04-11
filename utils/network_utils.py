@@ -2,7 +2,6 @@ import torch
 import os
 import time
 
-import kornia
 from torchvision.utils import flow_to_image, make_grid
 import torch.nn.functional as F
 import cv2
