@@ -81,7 +81,7 @@ class EPE(Metric):
 		self.num = num
 
 	def compute_metric(self, output, gt):
-		return torch.sum((output[self.num] - torch.nn.functional.interpolate(gt, scale_factor=(2 ** (self.num-2))))**2, 1).sqrt().mean()
+		return torch.sum((output[self.num] - torch.nn.functional.interpolate(gt*(2 ** (self.num-2)), scale_factor=(2 ** (self.num-2)) ))**2, 1).sqrt().mean()
 
 
 class DeblurringMetrics(Module):
