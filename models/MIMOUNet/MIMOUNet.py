@@ -103,12 +103,12 @@ class ExpandingBlock(nn.Module):
 
         ### Flow
         off4 = self.of_est4(self.FAH[0](f1_4, m1_4, d1_4), self.FAH[0](f2_4, m2_4, d2_4)) # offsets 200x200 feature res 200x200
-        off4_up = F.interpolate(off4, scale_factor=2)
+        off4_up = F.interpolate(off4, scale_factor=2) * 2.0
         outputsOF.append(off4)
 
-        wf2_2 = warp_flow(f2_2, off4_up * 2.0)
-        wm2_2 = warp_flow(m2_2, off4_up * 2.0)
-        wd2_2 = warp_flow(d2_2, off4_up * 2.0)
+        wf2_2 = warp_flow(f2_2, off4_up)
+        wm2_2 = warp_flow(m2_2, off4_up)
+        wd2_2 = warp_flow(d2_2, off4_up)
 
         ################################ SCALE 2 ######################################
 
@@ -127,12 +127,12 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_2)
 
         ### Homography
-        off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up * 2.0
-        off2_up = F.interpolate(off2, scale_factor=2)
+        off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
+        off2_up = F.interpolate(off2, scale_factor=2) * 2.0
         outputsOF.append(off2)
-        wf2_1 = warp_flow(f2_1, off2_up * 2.0)
-        wm2_1 = warp_flow(m2_1, off2_up * 2.0)
-        wd2_1 = warp_flow(d2_1, off2_up * 2.0)
+        wf2_1 = warp_flow(f2_1, off2_up)
+        wm2_1 = warp_flow(m2_1, off2_up)
+        wd2_1 = warp_flow(d2_1, off2_up)
 
         ################################ SCALE 1 ######################################
 
@@ -151,7 +151,7 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_1)
 
         ### Homography
-        off1 = self.of_est(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1)) + off2_up * 2.0
+        off1 = self.of_est(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1)) + off2_up
         outputsOF.append(off1)
 
         return [outputsS, outputsD, outputsOF]
