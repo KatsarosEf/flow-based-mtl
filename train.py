@@ -1,21 +1,21 @@
 import os
-
 import numpy as np
 import torch
 import wandb
-import torchvision
 from argparse import ArgumentParser
 from utils.dataset import MTL_Dataset
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
-from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
-from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
+from losses import OpticalFlowLoss
+from metrics import OpticalFlowMetrics
 from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVerticalFlip, RandomColorChannel,\
     ColorJitter
 from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
+import sys
+sys.path.append('core')
+from raft import RAFT
 
 task_weights = {'segment': 0.1,
                 'deblur': 1,
@@ -38,14 +38,6 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # Load the data and mount them on cuda
             if frame == args.prev_frames:
                 frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                m = torch.cat([seq['segment'][0].unsqueeze(1), 1 - seq['segment'][0].unsqueeze(1)], 1).float()
-                m2 = [F.interpolate(m, scale_factor=0.25),
-                      F.interpolate(m, scale_factor=0.5),
-                      m]
-
-                d2 = [F.interpolate(seq['image'][0], scale_factor=0.25),
-                      F.interpolate(seq['image'][0], scale_factor=0.5),
-                      seq['image'][0]]
             else:
                 frames.append(seq['image'][frame].to(args.device))
                 del frames[0]
@@ -59,16 +51,13 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # cv2.imwrite('./mask-t.jpg', gt_dict['segment'][0].numpy() * 255.0)
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
-            outputs = model(frames[0], frames[1], m2, d2)
-
-
+            outputs = model(frames[0], frames[1])
             outputs = dict(zip(tasks, outputs))
-            m2 = [x.detach() for x in outputs['segment']]
-            d2 = [x.detach() for x in outputs['deblur']]
 
             losses = {task: losses_dict[task](outputs[task], gt_dict[task]) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             optimizer.step()
 
@@ -111,12 +100,6 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 # Load the data and mount them on cuda
                 if frame == args.prev_frames:
                     frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                    m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200)).to(args.device),
-                          torch.zeros((frames[0].shape[0], 2, 400, 400)).to(args.device),
-                          torch.zeros((frames[0].shape[0], 2, 800, 800)).to(args.device)]
-                    d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
-                          F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
-                          seq['image'][0].to(args.device)]
                 else:
                     frames.append(seq['image'][frame].to(args.device))
                     del frames[0]
@@ -124,7 +107,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
                 [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
-                outputs = model(frames[0], frames[1], m2, d2)
+                outputs = model(frames[0], frames[1])
                 outputs = dict(zip(tasks, outputs))
 
                 task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
@@ -135,12 +118,9 @@ def val(args, dataloader, model, metrics_dict, epoch):
 
                 # visualize batch size (manually coded for 2)
                 if seq_idx < args.to_visualize:
-                    grids = [gridify(args, seq, outputs, d2, frame, batch_idx) for batch_idx in range(args.bs)]
+                    grids = [gridify(args, seq, outputs, frame, batch_idx) for batch_idx in range(args.bs)]
                     videos2make[i].append(grids[0])
                     videos2make[i+1].append(grids[1])
-
-                m2 = outputs['segment']
-                d2 = outputs['deblur']
 
             # Add the end of the small, 5-frame, sequences, log the videos, 2xvideos per batch
             if seq_idx < args.to_visualize:
@@ -159,7 +139,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
 def main(args):
 
 
-    tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
+    tasks = [task for task in ['flow'] if getattr(args, task)]
 
     transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
                                                     RandomVerticalFlip(), ToTensor(), Normalize()]),
@@ -173,22 +153,17 @@ def main(args):
 
 
     losses_dict = {
-        'segment': SemanticSegmentationLoss(args).to(args.device),
-        'deblur': DeblurringLoss(args).to(args.device),
         'flow': OpticalFlowLoss(args).to(args.device)
     }
     losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
 
     metrics_dict = {
-        'segment': SegmentationMetrics().to(args.device),
-        'deblur': DeblurringMetrics().to(args.device),
         'flow': OpticalFlowMetrics().to(args.device)
-
     }
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
+    model = RAFT(args, tasks).to(args.device)
     # params, fps, flops = measure_efficiency(args)
     # print(params, fps, flops)
 
@@ -209,7 +184,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
