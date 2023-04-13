@@ -25,6 +25,23 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
 
 
+def sequence_loss(flow_preds, flow_gt, gamma, max_flow):
+    """ Loss function defined over sequence of flow predictions """
+
+    n_predictions = len(flow_preds)
+    flow_loss = 0.0
+
+    # exlude invalid pixels and extremely large diplacements
+    mag = torch.sum(flow_gt ** 2, dim=1).sqrt()
+    valid = mag < max_flow
+
+    for i in range(n_predictions):
+        i_weight = gamma ** (n_predictions - i - 1)
+        i_loss = (flow_preds[i] - flow_gt).abs()
+        flow_loss += i_weight * (valid[:, None] * i_loss).mean()
+
+    return flow_loss
+
 def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_dict, epoch):
     tasks = model.module.tasks
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
@@ -54,7 +71,8 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             outputs = model(frames[0], frames[1])
             outputs = dict(zip(tasks, outputs))
 
-            losses = {task: losses_dict[task](outputs[task], gt_dict[task]) for task in tasks}
+            # losses = sequence_loss(outputs[task], flow_gt, gamma, max_flow)
+            losses = {task: sequence_loss(outputs[task], gt_dict[task], args.gamma, args.max_flow) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
 

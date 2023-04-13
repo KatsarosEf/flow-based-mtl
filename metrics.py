@@ -120,8 +120,8 @@ class OpticalFlowMetrics(Module):
 		super(OpticalFlowMetrics, self).__init__()
 		self.metrics = {
 			'EPE': EPE(num=2),
-			'EPE_med': EPE(num=1),
-			'EPE_low': EPE(num=0),
+			# 'EPE_med': EPE(num=1),
+			# 'EPE_low': EPE(num=0),
 		}
 
 	def forward(self, output, gt):
