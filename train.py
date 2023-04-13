@@ -188,7 +188,7 @@ def main(args):
     model = torch.nn.DataParallel(model).to(args.device)
     optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
 
     if args.resume:
         checkpoint_file_name = 'ckpt_{}.pth'.format(args.resume_epoch) if args.resume_epoch else 'ckpt.pth'
@@ -202,7 +202,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    wandb.init(project='mtl-ecai', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -214,7 +214,7 @@ def main(args):
 
         val(args, loader['val'], model, metrics_dict, epoch)
 
-        #model_save(model, optimizer, scheduler, epoch, args)
+        model_save(model, optimizer, scheduler, epoch, args)
 
 
 if __name__ == '__main__':

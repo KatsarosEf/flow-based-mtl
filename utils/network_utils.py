@@ -16,7 +16,7 @@ def gridify(args, seq, outputs, frame, batch_idx):
 
     a = seq_cpu['image'][frame][batch_idx]*255.0 # input t
     d = seq_cpu['image'][frame-1][batch_idx]*255.0
-    h = flow_to_image(outputs['flow'][2][batch_idx])
+    h = flow_to_image(outputs['flow'][batch_idx])
     i = flow_to_image(seq_cpu['flow'][frame][batch_idx])
     grid = make_grid([a,d,h,i], nrow=3, padding=20)
     grid = F.interpolate(grid.unsqueeze(0), scale_factor=.35).squeeze(0)
