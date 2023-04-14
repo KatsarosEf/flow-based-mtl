@@ -32,13 +32,14 @@ def sequence_loss(flow_preds, flow_gt, gamma, max_flow):
     flow_loss = 0.0
 
     # exlude invalid pixels and extremely large diplacements
-    mag = torch.sum(flow_gt ** 2, dim=1).sqrt()
-    valid = mag < max_flow
+    # mag = torch.sum(flow_gt ** 2, dim=1).sqrt()
+    # valid = mag < max_flow
 
     for i in range(n_predictions):
         i_weight = gamma ** (n_predictions - i - 1)
         i_loss = (flow_preds[i] - flow_gt).abs()
-        flow_loss += i_weight * (valid[:, None] * i_loss).mean()
+        flow_loss += i_weight * (i_loss).mean()
+        # flow_loss += i_weight * (valid[:, None] * i_loss).mean()
 
     return flow_loss
 
@@ -69,16 +70,17 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
             outputs = model(frames[0], frames[1])
-            outputs = dict(zip(tasks, outputs))
+
 
             # losses = sequence_loss(outputs[task], flow_gt, gamma, max_flow)
-            losses = {task: sequence_loss(outputs[task], gt_dict[task], args.gamma, args.max_flow) for task in tasks}
+            losses = {task: sequence_loss(outputs, gt_dict[task], args.gamma, args.max_flow) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             optimizer.step()
 
+            outputs = dict(zip(tasks, outputs))
             print('[TRAIN] [EPOCH:{}/{} ] [SEQ: {}/{}] Total Loss: {:.4f}\t{}'.format(epoch, args.epochs, seq_num+1, len(dataloader), loss, '\t'.join(
                 ['{} loss: {:.4f}'.format(task, losses[task]) for task in tasks])))
 
@@ -159,8 +161,10 @@ def main(args):
 
     tasks = [task for task in ['flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(),
-                                                    RandomVerticalFlip(), ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([
+        # RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(), RandomVerticalFlip(),
+                                                    ToTensor(), Normalize()]),
+
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
@@ -202,7 +206,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-ecai', entity='dst-cv')
+    wandb.init(project='mtl-ecai', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -210,7 +214,7 @@ def main(args):
 
     for epoch in range(start_epoch, args.epochs+1):
 
-        train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
+        #train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
 
         val(args, loader['val'], model, metrics_dict, epoch)
 

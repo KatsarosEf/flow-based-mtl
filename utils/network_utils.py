@@ -18,7 +18,7 @@ def gridify(args, seq, outputs, frame, batch_idx):
     d = seq_cpu['image'][frame-1][batch_idx]*255.0
     h = flow_to_image(outputs['flow'][batch_idx])
     i = flow_to_image(seq_cpu['flow'][frame][batch_idx])
-    grid = make_grid([a,d,h,i], nrow=3, padding=20)
+    grid = make_grid([a,d,h,i], nrow=2, padding=20)
     grid = F.interpolate(grid.unsqueeze(0), scale_factor=.35).squeeze(0)
 
     return cv2.cvtColor(grid.permute(1,2,0).cpu().numpy(), cv2.COLOR_BGR2RGB)
