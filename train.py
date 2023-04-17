@@ -161,8 +161,7 @@ def main(args):
 
     tasks = [task for task in ['flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([
-        # RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(), RandomVerticalFlip(),
+    transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(), RandomVerticalFlip(),
                                                     ToTensor(), Normalize()]),
 
                        'val': transforms.Compose([ToTensor(), Normalize()])}
@@ -170,7 +169,7 @@ def main(args):
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
-    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
+    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=split=="train", num_workers=1, pin_memory=True, drop_last=True)
               for split in ['train', 'val']}
 
 
@@ -212,6 +211,7 @@ def main(args):
 
 
 
+
     for epoch in range(start_epoch, args.epochs+1):
 
         train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     # parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
 
     parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/raft-ecai-augme', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)

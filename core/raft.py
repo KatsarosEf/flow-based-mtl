@@ -4,10 +4,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys
 sys.path.append('../../RAFT/')
-from core.update import BasicUpdateBlock, SmallUpdateBlock
-from core.extractor import BasicEncoder, SmallEncoder
+from core.update import BasicUpdateBlock
+from core.extractor import BasicEncoder
 from core.corr import CorrBlock, AlternateCorrBlock
-from core.utils.utils import bilinear_sampler, coords_grid, upflow8
+from core.utils.utils import coords_grid, upflow8
 
 try:
     autocast = torch.cuda.amp.autocast
