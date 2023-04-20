@@ -18,37 +18,31 @@ class ColorJitter(object):
 
     def __call__(self, sample):
 
-        if 'image' in sample.keys() and 'deblur' in sample.keys():
+        if 'image' in sample.keys():
 
             sample.update({'image': [Image.fromarray(np.uint8(_image)) for _image in sample['image']]})
-            sample.update({'deblur': [Image.fromarray(np.uint8(_deblur)) for _deblur in sample['deblur']]})
 
             if self.brightness > 0:
                 brightness_factor = np.random.uniform(max(0, 1 - self.brightness), 1 + self.brightness)
                 sample.update({'image': [F.adjust_brightness(_image, brightness_factor) for _image in sample['image']]})
-                #sample.update({'deblur': [F.adjust_brightness(_deblur, brightness_factor) for _deblur in sample['deblur']]})
                 sample['meta']['transformations']['brightness'] = brightness_factor
 
             if self.contrast > 0:
                 contrast_factor = np.random.uniform(max(0, 1 - self.contrast), 1 + self.contrast)
                 sample.update({'image': [F.adjust_contrast(_image, contrast_factor) for _image in sample['image']]})
-                #sample.update({'deblur': [F.adjust_contrast(_deblur, contrast_factor) for _deblur in sample['deblur']]})
                 sample['meta']['transformations']['contrast'] = contrast_factor
 
             if self.saturation > 0:
                 saturation_factor = np.random.uniform(max(0, 1 - self.saturation), 1 + self.saturation)
                 sample.update({'image': [F.adjust_saturation(_image, saturation_factor) for _image in sample['image']]})
-                #sample.update({'deblur': [F.adjust_saturation(_deblur, saturation_factor) for _deblur in sample['deblur']]})
                 sample['meta']['transformations']['saturation'] = saturation_factor
 
             if self.hue > 0:
                 hue_factor = np.random.uniform(-self.hue, self.hue)
                 sample.update({'image': [F.adjust_hue(_image, hue_factor) for _image in sample['image']]})
-                #sample.update({'deblur': [F.adjust_hue(_deblur, hue_factor) for _deblur in sample['deblur']]})
                 sample['meta']['transformations']['hue'] = hue_factor
 
             sample.update({'image': [np.asarray(_image).clip(0, 255) for _image in sample['image']]})
-            sample.update({'deblur': [np.asarray(_deblur).clip(0, 255) for _deblur in sample['deblur']]})
 
         return sample
 
