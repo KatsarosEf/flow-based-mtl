@@ -227,8 +227,8 @@ if __name__ == '__main__':
     # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
     # parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/raft-ecai-augme', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='../raft-ecai-augme', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
