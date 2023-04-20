@@ -18,7 +18,7 @@ class ColorJitter(object):
 
     def __call__(self, sample):
 
-        if 'image' in sample.keys() and 'deblur' in sample.keys():
+        if 'image' in sample.keys():
 
             sample.update({'image': [Image.fromarray(np.uint8(_image)) for _image in sample['image']]})
 
@@ -111,7 +111,7 @@ class RandomHorizontalFlip(object):
             if 'segment' in sample.keys():
                 sample.update({'segment': [np.copy(np.fliplr(_mask)) for _mask in sample['segment']]})
             if 'flow' in sample.keys():
-                sample.update({'flow': [np.copy(np.concatenate((-_flow[:,:,[0]], _flow[:,:,[1]]), 2)) for _flow in sample['flow']]})
+                sample.update({'flow': [np.copy(np.fliplr(np.concatenate((-_flow[:,:,[0]], _flow[:,:,[1]]), 2))) for _flow in sample['flow']]})
 
             sample['meta']['transformations']['horizontal_flip'] = True
         else:
@@ -133,7 +133,7 @@ class RandomVerticalFlip(object):
             if 'segment' in sample.keys():
                 sample.update({'segment': [np.copy(np.flipud(_mask)) for _mask in sample['segment']]})
             if 'flow' in sample.keys():
-                sample.update({'flow': [np.copy(np.concatenate((_flow[:,:,[0]], - _flow[:,:,[1]]), 2)) for _flow in sample['flow']]})
+                sample.update({'flow': [np.copy(np.flipud(np.concatenate((_flow[:,:,[0]], - _flow[:,:,[1]]), 2))) for _flow in sample['flow']]})
 
             sample['meta']['transformations']['vertical_flip'] = True
         else:

@@ -169,7 +169,7 @@ def main(args):
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
-    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
+    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=split=="train", num_workers=1, pin_memory=True, drop_last=True)
               for split in ['train', 'val']}
 
 
