@@ -161,9 +161,7 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([ColorJitter(),
-                                                    #RandomHorizontalFlip(), RandomVerticalFlip(),
-                                                    ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([ColorJitter(), ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
@@ -210,7 +208,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -222,14 +220,11 @@ def main(args):
 
         val(args, loader['val'], model, metrics_dict, epoch)
 
-        #model_save(model, optimizer, scheduler, epoch, args)
+        model_save(model, optimizer, scheduler, epoch, args)
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
-
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
-    # parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
 
     parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
     parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
@@ -241,10 +236,10 @@ if __name__ == '__main__':
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
     parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
 
-    parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
+    parser.add_argument('--lr', help='Set learning rate', default=1e-3, type=float)
     parser.add_argument('--wdecay', type=float, default=.0005)
     parser.add_argument('--epsilon', type=float, default=1e-8)
-    parser.add_argument('--clip', type=float, default=0.8)
+    parser.add_argument('--clip', type=float, default=0.99)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
     parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)

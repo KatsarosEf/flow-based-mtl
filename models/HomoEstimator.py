@@ -6,18 +6,32 @@ class HomoEstimator4(nn.Module):
         super(HomoEstimator4, self).__init__()
         self.conv2 = torch.nn.Sequential(nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
                                          nn.BatchNorm2d(256),
-                                         nn.ReLU(inplace=True))
-
-        self.conv3 = torch.nn.Sequential(nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(256),
-                                         nn.ReLU(inplace=True))
-
-        self.conv4 = torch.nn.Sequential(nn.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(256),
-                                         nn.ReLU(inplace=True))
+                                         nn.ReLU(inplace=True),
+                                         nn.Conv2d(256, 128, kernel_size=3, padding=1, bias=False),
+                                         nn.BatchNorm2d(128),
+                                         nn.ReLU(inplace=True),
+                                         nn.MaxPool2d(3, stride=2))
 
 
-        self.head = torch.nn.Sequential(nn.Conv2d(256, 2, kernel_size=3, padding=1))
+        self.conv3 = torch.nn.Sequential(nn.Conv2d(128, 128, kernel_size=3, padding=1, bias=False),
+                                         nn.BatchNorm2d(128),
+                                         nn.ReLU(inplace=True),
+                                         nn.Conv2d(128, 64, kernel_size=3, padding=1, bias=False),
+                                         nn.BatchNorm2d(64),
+                                         nn.ReLU(inplace=True),
+                                         nn.MaxPool2d(3, stride=2)
+                                         )
+
+        self.conv4 = torch.nn.Sequential(nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
+                                         nn.BatchNorm2d(64),
+                                         nn.ReLU(inplace=True),
+                                         nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
+                                         nn.BatchNorm2d(64),
+                                         nn.Dropout()
+                                         )
+
+
+        self.head = torch.nn.Sequential(nn.Conv2d(64, 2, kernel_size=3, padding=1, bias=False))
 
 
     def forward(self, m1, m2):
