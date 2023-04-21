@@ -131,6 +131,8 @@ class EPELoss(nn.Module):
 		return torch.mean((flow_pred[flow_gt.abs()<self.max_flow] - flow_gt[flow_gt.abs()<self.max_flow]).abs() + self.eps)
 
 
+
+
 class OpticalFlowLoss(nn.Module):
 
 	def __init__(self, args, device='cuda'):

@@ -161,8 +161,8 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(),
-                                                    RandomHorizontalFlip(), RandomVerticalFlip(),
+    transformations = {'train': transforms.Compose([ColorJitter(),
+                                                    #RandomHorizontalFlip(), RandomVerticalFlip(),
                                                     ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 

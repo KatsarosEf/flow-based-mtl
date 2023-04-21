@@ -76,12 +76,11 @@ class SSIM(Metric):
 
 class EPE(Metric):
 
-	def __init__(self, num):
+	def __init__(self):
 		super(EPE, self).__init__()
-		self.num = num
 
 	def compute_metric(self, output, gt):
-		return torch.sum((output[self.num] - torch.nn.functional.interpolate(gt, scale_factor=(2 ** (self.num-2)) ))**2, 1).sqrt().mean()
+		return torch.sum((output - gt)**2, 1).sqrt().mean()
 
 
 class DeblurringMetrics(Module):
@@ -119,9 +118,7 @@ class OpticalFlowMetrics(Module):
 	def __init__(self):
 		super(OpticalFlowMetrics, self).__init__()
 		self.metrics = {
-			'EPE': EPE(num=2),
-			'EPE_med': EPE(num=1),
-			'EPE_low': EPE(num=0),
+			'EPE': EPE(),
 		}
 
 	def forward(self, output, gt):
