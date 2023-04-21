@@ -1,9 +1,7 @@
 import os
-
 import numpy as np
 import torch
 import wandb
-import torchvision
 from argparse import ArgumentParser
 from utils.dataset import MTL_Dataset
 import torch.optim as optim
@@ -12,8 +10,7 @@ from torchvision import transforms
 from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
 from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
-from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVerticalFlip, RandomColorChannel,\
-    ColorJitter
+from utils.transforms import ToTensor, Normalize, ColorJitter
 from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
 
@@ -218,9 +215,9 @@ def main(args):
 
         train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
 
-        val(args, loader['val'], model, metrics_dict, epoch)
+        #val(args, loader['val'], model, metrics_dict, epoch)
 
-        model_save(model, optimizer, scheduler, epoch, args)
+        #model_save(model, optimizer, scheduler, epoch, args)
 
 
 if __name__ == '__main__':
