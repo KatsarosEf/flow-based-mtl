@@ -59,7 +59,6 @@ flow_names = [
     '/home/efklidis/ecai-dental/dentalflows/1294.npy',   # d9715e62-092c-4517-ba57-8b7eed6e18a9
     '/home/efklidis/ecai-dental/dentalflows/16846.npy',  # f821e60c-62d2-485c-8720-ad9c8530ba34
     '/home/efklidis/ecai-dental/dentalflows/668.npy',    # fbbba64e-127d-4eb1-a0d3-77af1baa230e
-
     '/home/efklidis/ecai-dental/dentalflows/5866.npy',   # f921a4fe-bbe2-4f29-90e7-40c024363840
 
 ]
