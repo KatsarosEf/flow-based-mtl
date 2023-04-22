@@ -14,9 +14,9 @@ from utils.transforms import ToTensor, Normalize, ColorJitter
 from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
 
-task_weights = {'segment': 0.1,
-                'deblur': 1,
-                'flow': 0.1}
+task_weights = {'segment': 0,
+                'deblur': 0,
+                'flow': 1}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
@@ -35,11 +35,9 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # Load the data and mount them on cuda
             if frame == args.prev_frames:
                 frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                m = torch.cat([seq['segment'][0].unsqueeze(1), 1 - seq['segment'][0].unsqueeze(1)], 1).float()
-                m2 = [F.interpolate(m, scale_factor=0.25),
-                      F.interpolate(m, scale_factor=0.5),
-                      m]
-
+                m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200)).to(args.device),
+                      torch.zeros((frames[0].shape[0], 2, 400, 400)).to(args.device),
+                      torch.zeros((frames[0].shape[0], 2, 800, 800)).to(args.device)]
                 d2 = [F.interpolate(seq['image'][0], scale_factor=0.25),
                       F.interpolate(seq['image'][0], scale_factor=0.5),
                       seq['image'][0]]
@@ -50,11 +48,6 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
             [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
-            # import cv2
-            # cv2.imwrite('./frame-t-1.jpg', frames[0][0].permute(1, 2, 0).numpy() * 255.0)
-            # cv2.imwrite('./frame-t.jpg', frames[1][0].permute(1, 2, 0).numpy() * 255.0)
-            # cv2.imwrite('./mask-t.jpg', gt_dict['segment'][0].numpy() * 255.0)
-            # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
             outputs = model(frames[0], frames[1], m2, d2)
 
@@ -63,7 +56,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             m2 = [x.detach() for x in outputs['segment']]
             d2 = [x.detach() for x in outputs['deblur']]
 
-            losses = {task: losses_dict[task](outputs[task], gt_dict[task]) for task in tasks}
+            losses = {task: losses_dict[task](outputs[task], gt_dict[task])*task_weights[task] for task in tasks}
             loss = sum(losses.values())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
@@ -158,7 +151,8 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([ColorJitter(), ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([# ColorJitter(),
+                                                    ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
@@ -228,13 +222,13 @@ if __name__ == '__main__':
     parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
-    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=2, type=int)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
     parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
 
-    parser.add_argument('--lr', help='Set learning rate', default=1e-3, type=float)
+    parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
     parser.add_argument('--wdecay', type=float, default=.0005)
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.99)

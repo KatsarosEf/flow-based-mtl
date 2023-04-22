@@ -150,10 +150,19 @@ class SD(nn.Module):
 
     def forward(self, x):
         x = self.conv(x)
-        x = self.conv_out(x) + x
+        x = self.conv_out(x)
         return x
 
+class DD(nn.Module):
+    def __init__(self, channel):
+        super(DD, self).__init__()
+        self.conv = BasicConv(channel, channel, kernel_size=3, stride=1, norm=True, relu=True)
+        self.conv_out = BasicConv(channel, 3, kernel_size=3, stride=1, norm=False, relu=False)
 
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.conv_out(x)
+        return x
 
 class SparseLocalBlock(nn.Module):
     r""" ConvNeXt Block. There are two equivalent implementations:

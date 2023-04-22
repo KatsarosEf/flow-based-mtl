@@ -57,20 +57,15 @@ class ExpandingBlock(nn.Module):
 
         self.FAMS = nn.ModuleList([GSA(128), GSA(64), GSA(32)])
 
-        self.ConvsOutDeb = nn.ModuleList(
-            [BasicConv(base_channel * 4, 64, kernel_size=3, relu=True, stride=1),
-             BasicConv(64, 3, kernel_size=3, relu=False, stride=1),
-
-             BasicConv(base_channel * 2, 32, kernel_size=3, relu=True, stride=1),
-             BasicConv(32, 3, kernel_size=3, relu=False, stride=1),
-
-             BasicConv(base_channel, 16, kernel_size=3, relu=True, stride=1),
-             BasicConv(16, 3, kernel_size=3, relu=False, stride=1)])
-
         self.ConvsOutS = nn.ModuleList(
             [SD(base_channel * 4),
              SD(base_channel * 2 + 2),
-             SD(base_channel + 2)])
+             SD(base_channel * 1 + 2)])
+
+        self.ConvsOutD = nn.ModuleList(
+            [DD(base_channel * 4),
+             DD(base_channel * 2),
+             DD(base_channel * 1)])
 
         self.FAH = nn.ModuleList(
             [FAM_homo(base_channel * 4),
@@ -94,7 +89,7 @@ class ExpandingBlock(nn.Module):
         ### Deblurring
         F4 = self.FAMS[0](f1_4, f2_4)
         z4 = self.Decoder[0](F4)
-        d1_4 = self.ConvsOutDeb[1](self.ConvsOutDeb[0](z4)) + x1_4
+        d1_4 = self.ConvsOutD[0](z4) + x1_4
         outputsD.append(d1_4)
 
         ### Segmentation
@@ -106,9 +101,9 @@ class ExpandingBlock(nn.Module):
         off4_up = F.interpolate(off4, scale_factor=2) * 2.0
         outputsOF.append(off4)
 
-        wf2_2 = warp_flow(f2_2, off4_up)
-        wm2_2 = warp_flow(m2_2, off4_up)
-        wd2_2 = warp_flow(d2_2, off4_up)
+        wf2_2 = f2_2 # warp_flow(f2_2, off4_up)
+        wm2_2 = m2_2 # warp_flow(m2_2, off4_up)
+        wd2_2 = d2_2 # warp_flow(d2_2, off4_up)
 
         ################################ SCALE 2 ######################################
 
@@ -118,7 +113,7 @@ class ExpandingBlock(nn.Module):
         z2 = torch.cat([z2, F2], dim=1)
         z2 = self.Convs[0](z2)
         z2 = self.Decoder[1](z2)
-        d1_2 = self.ConvsOutDeb[3](self.ConvsOutDeb[2](z2)) + x1_2
+        d1_2 = self.ConvsOutD[1](z2) + x1_2
         outputsD.append(d1_2)
 
         ### Segmentation
@@ -130,9 +125,9 @@ class ExpandingBlock(nn.Module):
         off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
         off2_up = F.interpolate(off2, scale_factor=2) * 2.0
         outputsOF.append(off2)
-        wf2_1 = warp_flow(f2_1, off2_up)
-        wm2_1 = warp_flow(m2_1, off2_up)
-        wd2_1 = warp_flow(d2_1, off2_up)
+        wf2_1 = f2_1 #warp_flow(f2_1, off2_up)
+        wm2_1 = m2_1 #warp_flow(m2_1, off2_up)
+        wd2_1 = d2_1 #warp_flow(d2_1, off2_up)
 
         ################################ SCALE 1 ######################################
 
@@ -142,7 +137,7 @@ class ExpandingBlock(nn.Module):
         z1 = torch.cat([z1, F1], dim=1)
         z1 = self.Convs[1](z1)
         z1 = self.Decoder[2](z1)
-        d1_1 = self.ConvsOutDeb[5](self.ConvsOutDeb[4](z1)) + x1_1
+        d1_1 = self.ConvsOutD[2](z1) + x1_1
         outputsD.append(d1_1)
 
         ### Segmentation
