@@ -149,7 +149,7 @@ class SD(nn.Module):
         self.conv_out = BasicConv(channel, 2, kernel_size=3, stride=1, norm=False, relu=False)
 
     def forward(self, x):
-        x = self.conv(x)
+        x = self.conv(x) + x
         x = self.conv_out(x)
         return x
 
@@ -160,7 +160,7 @@ class DD(nn.Module):
         self.conv_out = BasicConv(channel, 3, kernel_size=3, stride=1, norm=False, relu=False)
 
     def forward(self, x):
-        x = self.conv(x)
+        x = self.conv(x) + x
         x = self.conv_out(x)
         return x
 
