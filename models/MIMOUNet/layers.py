@@ -51,11 +51,10 @@ class ResBlock(nn.Module):
     def __init__(self, in_channel, out_channel):
         super(ResBlock, self).__init__()
         self.main = nn.Sequential(
-            BasicConv(in_channel, out_channel, kernel_size=3, stride=1, relu=True),
-            BasicConv(out_channel, out_channel, kernel_size=3, stride=1, relu=False))
-        #self.eca = ECAModule(out_channel)
+            BasicConv(in_channel, out_channel, kernel_size=3, stride=1, norm=True, relu=True),
+            BasicConv(out_channel, out_channel, kernel_size=3, stride=1, norm=False, relu=False))
     def forward(self, x):
-        return self.main(x) + x #self.eca(x)
+        return self.main(x) + x
 
 class FFTResBLock(nn.Module):
     def __init__(self, in_channel, out_channel):
@@ -122,13 +121,13 @@ class FAM_homo(nn.Module):
     def __init__(self, channel):
         super(FAM_homo, self).__init__()
         self.conv = BasicConv(channel, channel//2, kernel_size=1, stride=1, relu=False)
-        self.fe = BasicConv(3, channel // 2, kernel_size=3, stride=1, relu=False)
+        self.fe = BasicConv(5, channel // 2, kernel_size=3, stride=1, relu=False)
 
     def forward(self, feats, mask, restred_img):
-        mask = torch.nn.functional.softmax(mask, dim=1)[:,1,:,:].unsqueeze(1)
+        mask = torch.nn.functional.softmax(mask, dim=1)
         att_feats = self.conv(feats)
-        img_feats = self.fe(restred_img)
-        out = torch.cat([img_feats, att_feats], 1)  * mask
+        img_feats = self.fe(torch.cat([restred_img, mask], 1))
+        out = torch.cat([img_feats, att_feats], 1)
         return out
 
 class FAM(nn.Module):
@@ -146,12 +145,13 @@ class FAM(nn.Module):
 class SD(nn.Module):
     def __init__(self, channel):
         super(SD, self).__init__()
-        self.conv = BasicConv(channel, channel//2, kernel_size=3, stride=1, relu=True)
-        self.conv_out = BasicConv(channel//2, 2, kernel_size=3, stride=1, relu=False)
+        self.conv = BasicConv(channel, channel, kernel_size=3, stride=1, norm=True, relu=True)
+        self.conv_out = BasicConv(channel, 2, kernel_size=3, stride=1, norm=False, relu=False)
 
     def forward(self, x):
-        out = self.conv_out(self.conv(x))
-        return out
+        x = self.conv(x)
+        x = self.conv_out(x) + x
+        return x
 
 
 

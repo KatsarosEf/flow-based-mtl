@@ -215,7 +215,8 @@ def main(args):
 
         train(args, loader['train'], model, optimizer, scheduler, losses_dict, metrics_dict, epoch)
 
-        val(args, loader['val'], model, metrics_dict, epoch)
+        if epoch%20==0:
+            val(args, loader['val'], model, metrics_dict, epoch)
 
         model_save(model, optimizer, scheduler, epoch, args)
 
@@ -223,7 +224,7 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str) # # ../raid/data_ours_new_split
     parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
@@ -240,11 +241,11 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
     parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
-    parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=50, type=int)
+    parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=500, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
-    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=80, type=int)
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=400, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
