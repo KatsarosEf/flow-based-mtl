@@ -22,7 +22,30 @@ class ECAModule(nn.Module):
         y = self.sigmoid(y)
         return x * y.expand_as(x)
 
+class AFF(nn.Module):
+    def __init__(self, in_channel, out_channel):
+        super(AFF, self).__init__()
+        self.conv = nn.Sequential(
+            BasicConv(in_channel, out_channel, kernel_size=1, stride=1, relu=True),
+            BasicConv(out_channel, out_channel, kernel_size=3, stride=1, relu=False)
+        )
 
+    def forward(self, x1, x2, x4):
+        x = torch.cat([x1, x2, x4], dim=1)
+        return self.conv(x)
+class SCM(nn.Module):
+    def __init__(self, out_plane):
+        super(SCM, self).__init__()
+        self.main = nn.Sequential(
+            BasicConv(3, out_plane // 2, kernel_size=3, stride=1, relu=True),
+            BasicConv(out_plane // 2, out_plane-3, kernel_size=3, stride=1, relu=True)
+        )
+
+        self.conv = BasicConv(out_plane, out_plane, kernel_size=1, stride=1, relu=False)
+
+    def forward(self, x):
+        x = torch.cat([x, self.main(x)], dim=1)
+        return self.conv(x)
 class BasicConv(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size, stride, bias=True, norm=False, relu=True, transpose=False):
         super(BasicConv, self).__init__()

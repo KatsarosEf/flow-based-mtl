@@ -4,9 +4,8 @@ from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
 class ContractingBlock(nn.Module):
-    def __init__(self, args, block, nr_blocks=2):
+    def __init__(self, args, block, nr_blocks=5):
         super(ContractingBlock, self).__init__()
-        self.args = args
         base_channel = 32
 
         self.Encoder = nn.ModuleList([
@@ -26,21 +25,42 @@ class ContractingBlock(nn.Module):
                           BasicConv(base_channel*4, base_channel*4, kernel_size=3, norm=True, relu=True, stride=1))
         ])
 
+        self.SCM2 = SCM(64)
+        self.SCM4 = SCM(128)
+
+        self.comb2 = BasicConv(base_channel*4, base_channel*2, kernel_size=1, relu=False, stride=1)
+        self.comb4 = BasicConv(base_channel*8, base_channel*4, kernel_size=1, relu=False, stride=1)
+
+        self.AFFs = nn.ModuleList([
+            AFF(base_channel * 7, base_channel*1),
+            AFF(base_channel * 7, base_channel*2)
+        ])
+
     def forward(self, x1):
         x2 = F.interpolate(x1, scale_factor=0.5)
         x4 = F.interpolate(x2, scale_factor=0.5)
 
-        f1 = self.Encoder[0](self.feat_extract[0](x1))
+        z2 = self.SCM2(x2)
+        z4 = self.SCM4(x4)
 
-        z = self.feat_extract[1](f1)
-        f2 = self.Encoder[1](z)
+        _f1 = self.Encoder[0](self.feat_extract[0](x1))
 
-        z = self.feat_extract[2](f2)
+        z = self.comb2(torch.cat([z2, self.feat_extract[1](_f1)], 1))
+        # z = self.feat_extract[1](f1)
+        _f2 = self.Encoder[1](z)
+
+        z = self.comb4(torch.cat([z4, self.feat_extract[2](_f2)], 1))
+        # z = self.feat_extract[2](f2)
         f4 = self.Encoder[2](z)
+
+        f2 = self.AFFs[1](F.interpolate(f4, scale_factor=2), _f2, F.interpolate(_f1, scale_factor=0.5))
+        f1 = self.AFFs[0](F.interpolate(f4, scale_factor=4), F.interpolate(_f2, scale_factor=2), _f1)
+
 
         x = (x4, x2, x1)
         f = (f4, f2, f1)
         return x, f
+
 
 class ExpandingBlock(nn.Module):
     def __init__(self, args, block, nr_blocks=2):
@@ -62,8 +82,8 @@ class ExpandingBlock(nn.Module):
 
         self.ConvsOutS = nn.ModuleList(
             [SD(base_channel * 4),
-             SD(base_channel * 2 + 2),
-             SD(base_channel * 1 + 2)])
+             SD(base_channel * 2 + 2 + 2),
+             SD(base_channel * 1 + 2 + 2)])
 
         self.ConvsOutD = nn.ModuleList(
             [DD(base_channel * 4),
@@ -120,7 +140,7 @@ class ExpandingBlock(nn.Module):
 
         ### Segmentation
         m1_4_up = F.interpolate(m1_4, scale_factor=2)
-        m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up], 1)) + m1_4_up
+        m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up, off4_up], 1)) + m1_4_up
         outputsS.append(m1_2)
 
         off2_up = F.interpolate(off4, scale_factor=4) * 4.0
@@ -139,7 +159,7 @@ class ExpandingBlock(nn.Module):
 
         ### Segmentation
         m1_2_up = F.interpolate(m1_2, scale_factor=2)
-        m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up], 1)) + m1_2_up
+        m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up, off2_up], 1)) + m1_2_up
         outputsS.append(m1_1)
 
 
