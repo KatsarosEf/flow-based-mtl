@@ -9,23 +9,16 @@ import cv2
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters())
 
-def gridify(args, seq, outputs, d2, frame, batch_idx):
+def gridify(args, seq, outputs, frame, batch_idx):
     seq_cpu = {}
     seq_cpu['image'] = [x.to(args.device) for x in seq['image']]
-    seq_cpu['deblur'] = [x.to(args.device) for x in seq['deblur']]
-    seq_cpu['segment'] = [x.to(args.device) for x in seq['segment']]
     seq_cpu['flow'] = [x.to(args.device) for x in seq['flow']]
 
     a = seq_cpu['image'][frame][batch_idx]*255.0 # input t
-    b = outputs['deblur'][2][batch_idx].clip(0, 1) * 255.0
-    c = seq_cpu['deblur'][frame][batch_idx]*255.0
     d = seq_cpu['image'][frame-1][batch_idx]*255.0
-    e = torch.argmax(outputs['segment'][2][batch_idx], 0).repeat(3, 1, 1)*255.0
-    f = seq_cpu['segment'][frame][batch_idx].repeat(3, 1, 1)*255.0
-    g = d2[2][batch_idx].clip(0, 1)*255.0
-    h = flow_to_image(outputs['flow'][2][batch_idx])
+    h = flow_to_image(outputs['flow'][batch_idx])
     i = flow_to_image(seq_cpu['flow'][frame][batch_idx])
-    grid = make_grid([a,b,c,d,e,f,g,h,i], nrow=3, padding=20)
+    grid = make_grid([a,d,h,i], nrow=2, padding=20)
     grid = F.interpolate(grid.unsqueeze(0), scale_factor=.35).squeeze(0)
 
     return cv2.cvtColor(grid.permute(1,2,0).cpu().numpy(), cv2.COLOR_BGR2RGB)

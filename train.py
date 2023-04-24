@@ -84,7 +84,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
     tasks = model.module.tasks
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
     metric_cumltive = {k: [] for k in metrics}
-    model.train()
+    model.eval()
     videos2make = [[] for i in range(args.bs*args.to_visualize)]
     i = 0
     with torch.no_grad():
@@ -190,7 +190,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -208,12 +208,12 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str) # # ../raid/data_ours_new_split
-    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
 
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./overfit', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='./debug-ecai-mtl', type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    # parser.add_argument('--out', dest='out', help='Set output path', default='./debug-ecai-mtl', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
     parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
 
-    parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
+    parser.add_argument('--lr', help='Set learning rate', default=3e-4, type=float)
     parser.add_argument('--wdecay', type=float, default=.0005)
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.99)

@@ -39,7 +39,7 @@ class FlowNetS(nn.Module):
     def __init__(self, args, tasks, block, nr_blocks):
         super(FlowNetS,self).__init__()
 
-        self.batchNorm = False
+        self.batchNorm = True
         self.tasks = tasks
         self.args = args
 
@@ -124,14 +124,14 @@ class FlowNetS(nn.Module):
                          torch.nn.functional.interpolate(flow4, (800, 800))*16.0,
                          torch.nn.functional.interpolate(flow5, (800, 800))*32.0,
                          torch.nn.functional.interpolate(flow6, (800, 800))*64.0]
-            return [outputsS, outputsD, outputsOF] #torch.nn.functional.interpolate(flow2, (800, 800))*4.0]
+            return [outputsS, outputsD, torch.nn.functional.interpolate(flow2, (800, 800))*4.0]
         else:
             outputsOF = [torch.nn.functional.interpolate(flow2, (800, 800))*4.0,
                          torch.nn.functional.interpolate(flow3, (800, 800))*8.0,
                          torch.nn.functional.interpolate(flow4, (800, 800))*16.0,
                          torch.nn.functional.interpolate(flow5, (800, 800))*32.0,
                          torch.nn.functional.interpolate(flow6, (800, 800))*64.0]
-            return [outputsS, outputsD, outputsOF] #torch.nn.functional.interpolate(flow2, (800, 800))*4.0]
+            return [outputsS, outputsD, torch.nn.functional.interpolate(flow2, (800, 800))*4.0]
 
     def weight_parameters(self):
         return [param for name, param in self.named_parameters() if 'weight' in name]
