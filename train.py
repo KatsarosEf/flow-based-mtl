@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
 from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
-from models.MIMOUNet.FlowNet import FlowNetS
+from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize
 from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
@@ -19,7 +19,7 @@ task_weights = {'segment': 0,
                 'flow': 1}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
 
 
 def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_dict, epoch):
@@ -35,6 +35,9 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # Load the data and mount them on cuda
             if frame == args.prev_frames:
                 frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
+                m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200), device='cuda'),
+                      torch.zeros((frames[0].shape[0], 2, 400, 400), device='cuda'),
+                      torch.zeros((frames[0].shape[0], 2, 800, 800), device='cuda')]
                 d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
                       F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
                       seq['image'][0].to(args.device)]
@@ -46,8 +49,10 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
             optimizer.zero_grad()
-            outputs = model(frames[0], frames[1])
+            outputs = model(frames[0], frames[1], m2, d2)
             outputs = dict(zip(tasks, outputs))
+            m2 = [x.detach() for x in outputs['segment']]
+            d2 = [x.detach() for x in outputs['deblur']]
 
             losses = {task: losses_dict[task](outputs[task], gt_dict[task])*task_weights[task] for task in tasks}
             loss = sum(losses.values())
@@ -88,12 +93,14 @@ def val(args, dataloader, model, metrics_dict, epoch):
     videos2make = [[] for i in range(args.bs*args.to_visualize)]
     i = 0
     with torch.no_grad():
-
         for seq_idx, seq in enumerate(dataloader):
             for frame in range(args.prev_frames, args.seq_len):
                 # Load the data and mount them on cuda
                 if frame == args.prev_frames:
                     frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
+                    m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200), device='cuda'),
+                          torch.zeros((frames[0].shape[0], 2, 400, 400), device='cuda'),
+                          torch.zeros((frames[0].shape[0], 2, 800, 800), device='cuda')]
                     d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
                           F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
                           seq['image'][0].to(args.device)]
@@ -104,7 +111,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
                 [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
-                outputs = model(frames[0], frames[1])
+                outputs = model(frames[0], frames[1], m2, d2)
                 outputs = dict(zip(tasks, outputs))
 
                 task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
@@ -170,7 +177,7 @@ def main(args):
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = FlowNetS(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
+    model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
     # params, fps, flops = measure_efficiency(args)
     # print(params, fps, flops)
 
@@ -211,9 +218,8 @@ if __name__ == '__main__':
     # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str) # # ../raid/data_ours_new_split
     # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
 
-
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./overfit', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='./debug-ecai-mtl', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../overfit', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='../debug-ecai-mtl', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
