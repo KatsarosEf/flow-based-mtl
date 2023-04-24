@@ -133,6 +133,7 @@ class EPELoss(nn.Module):
 
 
 
+
 class OpticalFlowLoss(nn.Module):
 
 	def __init__(self, args, device='cuda'):
@@ -146,7 +147,7 @@ class OpticalFlowLoss(nn.Module):
 			losses = []
 			for num, elem in enumerate(output[::-1]):
 				losses.append(self.EPELoss(elem, gt))
-			EPELoss = sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))])
+			EPELoss = sum([losses[i]*(self.gamma**(len(output) - i - 1)) for i in range(len(output))]) / len(losses)
 		else:
 			EPELoss = self.EPELoss(output, gt)
 		return EPELoss
