@@ -10,7 +10,7 @@ from torchvision import transforms
 from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
 from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.FlowNet import FlowNetS
-from utils.transforms import ToTensor, Normalize
+from utils.transforms import *
 from utils.network_utils import model_save, model_load, gridify
 import torch.nn.functional as F
 
@@ -44,9 +44,9 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
 
             optimizer.zero_grad()
             outputs = model(frames[0], frames[1])
-            outputs = dict(zip(tasks, outputs))
+            #outputs = dict(zip(tasks, outputs))
 
-            losses = {task: losses_dict[task](outputs[task], gt_dict[task])*task_weights[task] for task in tasks}
+            losses = {task: losses_dict[task](outputs, gt_dict[task])*task_weights[task] for task in tasks}
             loss = sum(losses.values())
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
@@ -56,7 +56,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
                 ['{} loss: {:.4f}'.format(task, losses[task]) for task in tasks])))
 
             # Compute metrics for the tasks at hand
-            task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
+            task_metrics = {task: metrics_dict[task](outputs, gt_dict[task]) for task in tasks}
             metrics_values = {k: v.item() for task in tasks for k, v in task_metrics[task].items()}
 
             print("[TRAIN] [EPOCH:{}/{} ] {}".format(epoch, args.epochs, '\t'.join(
@@ -99,9 +99,9 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
                 outputs = model(frames[0], frames[1])
-                outputs = dict(zip(tasks, outputs))
+                #outputs = dict(zip(tasks, outputs))
 
-                task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
+                task_metrics = {task: metrics_dict[task](outputs, gt_dict[task]) for task in tasks}
                 metrics_values = {k: v.item() for task in tasks for k, v in task_metrics[task].items()}
 
                 print("[VAL] [EPOCH:{}/{} ] {}".format(epoch, args.epochs, '\t'.join(
@@ -134,30 +134,27 @@ def val(args, dataloader, model, metrics_dict, epoch):
 def main(args):
 
 
-    tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
+    tasks = [task for task in ['flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([RandomColorChannel(), ColorJitter(), RandomHorizontalFlip(), RandomVerticalFlip(),
+                                                    ToTensor(), Normalize()]),
+
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
-    loader = {split: DataLoader(data['train'], batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
+    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=split=="train", num_workers=1, pin_memory=True, drop_last=True)
               for split in ['train', 'val']}
 
 
     losses_dict = {
-        'segment': SemanticSegmentationLoss(args).to(args.device),
-        'deblur': DeblurringLoss(args).to(args.device),
         'flow': OpticalFlowLoss(args).to(args.device)
     }
     losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
 
     metrics_dict = {
-        'segment': SegmentationMetrics().to(args.device),
-        'deblur': DeblurringMetrics().to(args.device),
         'flow': OpticalFlowMetrics().to(args.device)
-
     }
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
@@ -182,9 +179,10 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-ecai', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
+
 
 
 
