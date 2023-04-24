@@ -1,11 +1,12 @@
 from models.MIMOUNet.layers import *
-from models.HomoEstimator import HomoEstimator, HomoEstimator2, HomoEstimator4
+from models.HomoEstimator import HomoEstimator4
 from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
 class ContractingBlock(nn.Module):
     def __init__(self, args, block, nr_blocks=2):
         super(ContractingBlock, self).__init__()
+        self.args = args
         base_channel = 32
 
         self.Encoder = nn.ModuleList([
@@ -24,9 +25,6 @@ class ContractingBlock(nn.Module):
             nn.Sequential(BasicConv(base_channel*2, base_channel*4, kernel_size=5, norm=True, relu=True, stride=2),
                           BasicConv(base_channel*4, base_channel*4, kernel_size=3, norm=True, relu=True, stride=1))
         ])
-
-
-
 
     def forward(self, x1):
         x2 = F.interpolate(x1, scale_factor=0.5)
