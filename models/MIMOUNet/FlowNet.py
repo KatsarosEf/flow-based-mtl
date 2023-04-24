@@ -80,7 +80,6 @@ class FlowNetS(nn.Module):
                 constant_(m.bias, 0)
 
     def forward(self, x2, x1):
-        outputsD, outputsOF, outputsS = list(), list(), list()
         x = torch.cat([x2, x1], 1)
         out_conv2 = self.conv2(self.conv1(x))
         out_conv3 = self.conv3_1(self.conv3(out_conv2))
@@ -109,13 +108,6 @@ class FlowNetS(nn.Module):
 
         concat2 = torch.cat((out_conv2,out_deconv2,flow3_up),1)
         flow2 = self.predict_flow2(concat2)
-
-        outputsD.append(torch.ones((x2.shape[0], 3, 200, 200)).cuda())
-        outputsS.append(torch.ones((x2.shape[0], 2, 200, 200)).cuda())
-        outputsD.append(torch.ones((x2.shape[0], 3, 400, 400)).cuda())
-        outputsS.append(torch.ones((x2.shape[0], 2, 400, 400)).cuda())
-        outputsD.append(torch.ones((x2.shape[0], 3, 800, 800)).cuda())
-        outputsS.append(torch.ones((x2.shape[0], 2, 800, 800)).cuda())
 
 
         if self.training:
