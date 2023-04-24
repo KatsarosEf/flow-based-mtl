@@ -35,9 +35,6 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # Load the data and mount them on cuda
             if frame == args.prev_frames:
                 frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
-                      F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
-                      seq['image'][0].to(args.device)]
             else:
                 frames.append(seq['image'][frame].to(args.device))
                 del frames[0]
@@ -94,9 +91,6 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 # Load the data and mount them on cuda
                 if frame == args.prev_frames:
                     frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                    d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
-                          F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
-                          seq['image'][0].to(args.device)]
                 else:
                     frames.append(seq['image'][frame].to(args.device))
                     del frames[0]
@@ -118,12 +112,10 @@ def val(args, dataloader, model, metrics_dict, epoch):
 
                 # visualize batch size (manually coded for 2)
                 if seq_idx < args.to_visualize:
-                    grids = [gridify(args, seq, outputs, d2, frame, batch_idx) for batch_idx in range(args.bs)]
+                    grids = [gridify(args, seq, outputs, frame, batch_idx) for batch_idx in range(args.bs)]
                     videos2make[i].append(grids[0])
                     videos2make[i+1].append(grids[1])
 
-                m2 = outputs['segment']
-                d2 = outputs['deblur']
 
             # Add the end of the small, 5-frame, sequences, log the videos, 2xvideos per batch
             if seq_idx < args.to_visualize:
@@ -176,7 +168,7 @@ def main(args):
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
 
     if args.resume:
         checkpoint_file_name = 'ckpt_{}.pth'.format(args.resume_epoch) if args.resume_epoch else 'ckpt.pth'
