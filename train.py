@@ -175,8 +175,7 @@ def main(args):
     # print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
-    optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
     if args.resume:
@@ -191,7 +190,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 

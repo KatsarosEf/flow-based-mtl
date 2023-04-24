@@ -123,7 +123,7 @@ class OpticalFlowMetrics(Module):
 
 	def forward(self, output, gt):
 		with torch.no_grad():
-			metric_results = {metric: metric_function(output, gt) for metric, metric_function in self.metrics.items()}
+			metric_results = {metric: metric_function(output[0], gt) for metric, metric_function in self.metrics.items()}
 		return metric_results
 
 
