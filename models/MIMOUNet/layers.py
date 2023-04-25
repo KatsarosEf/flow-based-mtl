@@ -168,12 +168,15 @@ class FAM(nn.Module):
 class SD(nn.Module):
     def __init__(self, channel):
         super(SD, self).__init__()
-        self.conv = BasicConv(channel, channel, kernel_size=3, stride=1, norm=True, relu=True)
-        self.conv_out = BasicConv(channel, 2, kernel_size=3, stride=1, norm=False, relu=False)
-
+        self.conv1 = BasicConv(channel, channel, kernel_size=3, stride=1, norm=True, relu=True)
+        self.pool1 = nn.MaxPool2d(3, stride=2, padding=1)
+        self.conv2 = BasicConv(channel, channel//2, kernel_size=3, stride=1, norm=True, relu=True)
+        self.pool2 = nn.MaxPool2d(3, stride=2, padding=1)
+        self.convout = BasicConv(channel//2, 2, kernel_size=3, stride=1, norm=False, relu=False)
     def forward(self, x):
-        x = self.conv(x) + x
-        x = self.conv_out(x)
+        x = self.pool1(self.conv1(x) + x)
+        x = self.pool2(self.conv2(x))
+        x = F.interpolate(self.convout(x), scale_factor=4.0)
         return x
 
 class DD(nn.Module):

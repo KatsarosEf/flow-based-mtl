@@ -15,14 +15,9 @@ class ContractingBlock(nn.Module):
         ])
 
         self.feat_extract = nn.ModuleList([
-            nn.Sequential(BasicConv(3, base_channel, kernel_size=7, norm=True, relu=True, stride=1),
-                          BasicConv(base_channel, base_channel, kernel_size=3, norm=True, relu=True, stride=1)),
-
-            nn.Sequential(BasicConv(base_channel, base_channel*2, kernel_size=5, norm=True, relu=True, stride=2),
-                          BasicConv(base_channel*2, base_channel*2, kernel_size=3, norm=True, relu=True, stride=1)),
-
-            nn.Sequential(BasicConv(base_channel*2, base_channel*4, kernel_size=5, norm=True, relu=True, stride=2),
-                          BasicConv(base_channel*4, base_channel*4, kernel_size=3, norm=True, relu=True, stride=1))
+            nn.Sequential(BasicConv(3, base_channel, kernel_size=5, norm=True, relu=True, stride=1)),
+            nn.Sequential(BasicConv(base_channel, base_channel*2, kernel_size=5, norm=True, relu=True, stride=2)),
+            nn.Sequential(BasicConv(base_channel*2, base_channel*4, kernel_size=5, norm=True, relu=True, stride=2))
         ])
 
         self.SCM2 = SCM(64)
