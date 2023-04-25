@@ -71,7 +71,7 @@ def model_save(model, optimizer, scheduler, epoch, args, save_best=False):
 
 def model_load(path, model, optimizer=None, scheduler=None):
     checkpoint = torch.load(path)
-    model.load_state_dict(checkpoint['state'], strict=False)
+    model.load_state_dict(checkpoint['state'], strict=True)
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer'], strict=False)
     if scheduler is not None:
