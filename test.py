@@ -17,9 +17,12 @@ import sys
 sys.path.append('core')
 from raft import RAFT
 import tqdm
+from torchvision.utils import flow_to_image
+import cv2
 
-def save_outputs(args, seq_name, name, output_dict):
-    return []
+def save_outputs(args, outputs, seq_name, name):
+    flo = flow_to_image(outputs['flow'])
+    cv2.imwrite('{}/{}'.format(os.path.join(args.out, seq_name, 'flows'), name)[:-4] + '.png', flo.permute(1,2,0).cpu().numpy())
 
 def evaluate(args, dataloader, model, metrics_dict):
 
@@ -54,7 +57,7 @@ def evaluate(args, dataloader, model, metrics_dict):
             outputs = dict(zip(tasks, outputs))
 
             name = seq['meta']['paths'][frame][0].split('/')[-1]
-            save_outputs(args, seq_name, name, outputs)
+            save_outputs(args, outputs, seq_name, name)
 
             task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
             metrics_values = {k: torch.round((10**3 * v))/(10**3) for task in tasks for k, v in task_metrics[task].items()}
