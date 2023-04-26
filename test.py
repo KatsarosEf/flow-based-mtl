@@ -37,7 +37,7 @@ def evaluate(args, dataloader, model, metrics_dict):
         print(seq_name)
         os.makedirs(os.path.join(args.out, seq_name, 'flows'), exist_ok=True)
 
-        results = open(os.path.join(args.out, seq_name, 'results.txt'), 'w')
+        #results = open(os.path.join(args.out, seq_name, 'results.txt'), 'w')
 
         for frame in tqdm.tqdm(range(args.prev_frames, len(seq['meta']['paths']))):
 
@@ -56,8 +56,8 @@ def evaluate(args, dataloader, model, metrics_dict):
                 outputs = model(frames[0], frames[1])[-1]
             outputs = dict(zip(tasks, outputs))
 
-            name = seq['meta']['paths'][frame][0].split('/')[-1]
-            save_outputs(args, outputs, seq_name, name)
+            #name = seq['meta']['paths'][frame][0].split('/')[-1]
+            #save_outputs(args, outputs, seq_name, name)
 
             task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
             metrics_values = {k: torch.round((10**3 * v))/(10**3) for task in tasks for k, v in task_metrics[task].items()}
@@ -65,7 +65,7 @@ def evaluate(args, dataloader, model, metrics_dict):
             for metric in metrics:
                 metric_cumltive[metric].append(metrics_values[metric])
 
-            results.write('\nFrame {}, EPE: {:.3f} \n'.format(name, metrics_values['EPE']))
+            #results.write('\nFrame {}, EPE: {:.3f} \n'.format(name, metrics_values['EPE']))
 
     metric_averages = {m: sum(metric_cumltive[m])/len(metric_cumltive[m]) for m in metrics}
     print("\n[TEST] {}\n".format(' '.join(['{}: {:.3f}'.format(m, metric_averages[m]) for m in metrics])))
@@ -81,7 +81,7 @@ def main(args):
     tasks = ['flow']
 
     transformations = {'test': transforms.Compose([ToTensor(), Normalize()])}
-    data = {'test': MTL_TestDataset(tasks, args.data_path, 'test', args.seq_len, transform=transformations['test'])}
+    data = {'test': MTL_TestDataset(tasks, args.data_path, 'val', args.seq_len, transform=transformations['test'])}
     loader = {'test': DataLoader(data['test'], batch_size=args.bs, shuffle=False, num_workers=0, pin_memory=False)}
 
 
