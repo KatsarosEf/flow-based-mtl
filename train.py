@@ -218,7 +218,7 @@ if __name__ == '__main__':
     # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl-overfit-debug', type=str)
 
     parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='../mtl-mostnet-sw', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-mostnet-sw', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
@@ -232,13 +232,13 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.9)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--bs', help='Set size of the batch size', default=6, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=150, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
-    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=140, type=int)
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=130, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
