@@ -178,8 +178,8 @@ def main(args):
 
 
     model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
-    params, fps = measure_efficiency(args)
-    print(params, fps)
+    params, fps, flops = measure_efficiency(args)
+    print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
@@ -197,7 +197,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -214,11 +214,11 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str)
-    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl-overfit-debug', type=str)
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-flownet_leg', type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
+    # parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-flownet_leg', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
