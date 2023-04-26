@@ -22,7 +22,7 @@ task_weights = {'segment': 0.1,
                 'flow': 0.1}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
 
 
 def sequence_loss(flow_preds, flow_gt, gamma, max_flow):
@@ -69,11 +69,11 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # cv2.imwrite('./mask-t.jpg', gt_dict['segment'][0].numpy() * 255.0)
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
-            outputs = model(frames[0], frames[1])[-1]
-            outputs = dict(zip(tasks, outputs))
+            outputs = model(frames[0], frames[1])
+
 
             # losses = sequence_loss(outputs[task], flow_gt, gamma, max_flow)
-            losses = {task: sequence_loss(outputs[task], gt_dict[task], args.gamma, args.max_flow) for task in tasks}
+            losses = {task: sequence_loss(outputs, gt_dict[task], args.gamma, args.max_flow) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
 
@@ -127,9 +127,8 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
                 outputs = model(frames[0], frames[1])[-1]
-                outputs = dict(zip(tasks, outputs))
 
-                task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
+                task_metrics = {task: metrics_dict[task](outputs, gt_dict[task]) for task in tasks}
                 metrics_values = {k: v.item() for task in tasks for k, v in task_metrics[task].items()}
 
                 for metric in metrics:
