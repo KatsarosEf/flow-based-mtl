@@ -183,7 +183,7 @@ def main(args):
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0.5*1e-6)
 
     if args.resume:
         checkpoint_file_name = 'ckpt_{}.pth'.format(args.resume_epoch) if args.resume_epoch else 'ckpt.pth'
@@ -197,7 +197,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -214,11 +214,11 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl-overfit-debug', type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str)
+    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl-overfit-debug', type=str)
 
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
-    # parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-flownet_leg', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-flownet_dw', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
-    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=100, type=int)
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=130, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
