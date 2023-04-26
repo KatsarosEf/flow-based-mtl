@@ -69,23 +69,22 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
             # cv2.imwrite('./mask-t.jpg', gt_dict['segment'][0].numpy() * 255.0)
             # Compute model predictions, errors and gradients and perform the update
             optimizer.zero_grad()
-            outputs = model(frames[0], frames[1])
-
+            outputs = model(frames[0], frames[1])[-1]
+            outputs = dict(zip(tasks, outputs))
 
             # losses = sequence_loss(outputs[task], flow_gt, gamma, max_flow)
-            losses = {task: sequence_loss(outputs, gt_dict[task], args.gamma, args.max_flow) for task in tasks}
+            losses = {task: sequence_loss(outputs[task], gt_dict[task], args.gamma, args.max_flow) for task in tasks}
             loss = sum(losses.values())
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             optimizer.step()
 
-            outputs = dict(zip(tasks, outputs))
             print('[TRAIN] [EPOCH:{}/{} ] [SEQ: {}/{}] Total Loss: {:.4f}\t{}'.format(epoch, args.epochs, seq_num+1, len(dataloader), loss, '\t'.join(
                 ['{} loss: {:.4f}'.format(task, losses[task]) for task in tasks])))
 
             # Compute metrics for the tasks at hand
-            task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
+            task_metrics = {task: metrics_dict[task](outputs[-1], gt_dict[task]) for task in tasks}
             metrics_values = {k: v.item() for task in tasks for k, v in task_metrics[task].items()}
 
             print("[TRAIN] [EPOCH:{}/{} ] {}".format(epoch, args.epochs, '\t'.join(
@@ -127,7 +126,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
                 [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
-                outputs = model(frames[0], frames[1])
+                outputs = model(frames[0], frames[1])[-1]
                 outputs = dict(zip(tasks, outputs))
 
                 task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
@@ -136,16 +135,16 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 for metric in metrics:
                     metric_cumltive[metric].append(metrics_values[metric])
 
-                # visualize batch size (manually coded for 2)
-                if seq_idx < args.to_visualize:
-                    grids = [gridify(args, seq, outputs, frame, batch_idx) for batch_idx in range(args.bs)]
-                    videos2make[i].append(grids[0])
-                    videos2make[i+1].append(grids[1])
-
-            # Add the end of the small, 5-frame, sequences, log the videos, 2xvideos per batch
-            if seq_idx < args.to_visualize:
-                [wandb.log({"video_{}".format(idx): wandb.Video(np.stack((videos2make[idx])).transpose((0,3,1,2)).astype(np.uint8), fps=1)}) for idx in range(0+i, i+2)]
-                i += 2
+            #     # visualize batch size (manually coded for 2)
+            #     if seq_idx < args.to_visualize:
+            #         grids = [gridify(args, seq, outputs, frame, batch_idx) for batch_idx in range(args.bs)]
+            #         videos2make[i].append(grids[0])
+            #         videos2make[i+1].append(grids[1])
+            #
+            # # Add the end of the small, 5-frame, sequences, log the videos, 2xvideos per batch
+            # if seq_idx < args.to_visualize:
+            #     [wandb.log({"video_{}".format(idx): wandb.Video(np.stack((videos2make[idx])).transpose((0,3,1,2)).astype(np.uint8), fps=1)}) for idx in range(0+i, i+2)]
+            #     i += 2
 
         metric_averages = {m: sum(metric_cumltive[m])/len(metric_cumltive[m]) for m in metrics}
         print("\n[VALIDATION] [EPOCH:{}/{}] {}\n".format(epoch, args.epochs,
@@ -205,7 +204,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-ecai', entity='dst-cv')
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -227,8 +226,11 @@ if __name__ == '__main__':
     # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='C:\\Users\\User\\PycharmProjects\\raid\\dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
     # parser.add_argument('--out', dest='out', help='Set output path', default='C:\\Users\\User\\PycharmProjects\\raid\\ecai-mtl', type=str)
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='../raft-ecai-augme', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug', type=str)
+
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
+    # parser.add_argument('--out', dest='out', help='Set output path', default='../raft-ecai-augme', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
@@ -248,7 +250,7 @@ if __name__ == '__main__':
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
-    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=110, type=int)
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=400, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
