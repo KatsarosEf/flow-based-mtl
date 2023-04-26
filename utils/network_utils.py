@@ -83,33 +83,23 @@ def model_load(path, model, optimizer=None, scheduler=None):
 
 def measure_efficiency(args):
 
-    from models.MIMOUNet.MIMOUNet_fake import VideoMIMOUNet_fake
+    from models.MIMOUNet.FlowNet import FlowNetS
 
-    model = VideoMIMOUNet_fake(['segment', 'deblur', 'homography'], nr_blocks=args.nr_blocks, block=args.block).to(args.device)
+    model = FlowNetS(args, ['flow'], nr_blocks=args.nr_blocks, block=args.block).to('cuda')
     dims = 800, 800
     x1, x2 = [torch.randn((1, 3, *dims)).cuda(non_blocking=True), torch.randn((1, 3, *dims)).cuda(non_blocking=True)]
-    m2 = [torch.rand((x1.shape[0], 2, 200, 200), device='cuda'),
-          torch.rand((x1.shape[0], 2, 400, 400), device='cuda'),
-          torch.rand((x1.shape[0], 2, 800, 800), device='cuda')]
-    d2 = [torch.rand((x1.shape[0], 3, 200, 200), device='cuda'),
-          torch.rand((x1.shape[0], 3, 400, 400), device='cuda'),
-          torch.rand((x1.shape[0], 3, 800, 800), device='cuda')]
 
     times = []
     with torch.no_grad():
         for i in range(60):
             torch.cuda.synchronize()
             test_time_start = time.time()
-            _ = model.forward(x1, x2, m2, d2)
+            _ = model.forward(x1, x2)
             torch.cuda.synchronize()
             times.append(time.time() - test_time_start)
 
     fps = round(1 / (sum(times[30:])/len(times[30:])), 2)
     params = count_parameters(model) / 10 ** 6
-    flops = FlopCountAnalysis(model, (x1, x2, m2, d2)).total() * 1e-9
     del model
-    return params, fps, flops
+    return params, fps
 
-
-def warp(image, homography):
-    return kornia.geometry.warp_perspective(image, homography, image.shape[-2:])

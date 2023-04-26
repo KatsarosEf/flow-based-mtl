@@ -255,7 +255,7 @@ class MTL_TestDataset(data.Dataset):
         if self.do_deblur:
             sample['deblur'] = self._load_deblur(index)
 
-        if self.do_homo:
+        if self.do_flow:
             sample['flow'] = self._load_flow(index)
 
         if self.meta:
@@ -277,8 +277,8 @@ class MTL_TestDataset(data.Dataset):
     def _load_mask(self, index):
         return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.masks[index]]
 
-    def _load_homo(self, index):
-        return [np.load(path).astype(np.float32) for path in self.flows[index]]
+    def _load_flow(self, index):
+        return [np.load(path).astype(np.float32) for path in self.flows[index]] # need to process flow to
 
     def __len__(self):
         return len(self.images)
