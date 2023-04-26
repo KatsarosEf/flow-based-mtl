@@ -144,7 +144,7 @@ class ExpandingBlock(nn.Module):
 
         off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
         off2_up = F.interpolate(off2, scale_factor=2.0) * 2.0
-        outputsOF.append(F.interpolate(off2, (800, 800))*2.0)
+        outputsOF.append(off2_up)
 
         wf2_1 = warp_flow(f2_1, off2_up)
         wm2_1 = warp_flow(m2_1, off2_up)
@@ -167,7 +167,7 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_1)
 
         # ### Flow
-        off = self.of_est(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1))
+        off = self.of_est(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1)) + off2_up
         outputsOF.append(off)
 
         return [outputsS, outputsD, outputsOF]

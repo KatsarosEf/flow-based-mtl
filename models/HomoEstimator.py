@@ -231,4 +231,4 @@ class HomoEstimator(nn.Module):
         concat1 = torch.cat((out_deconv1,flow2_up),1)
         flow1 = self.predict_flow1(concat1)
 
-        return flow1
+        return torch.nn.functional.interpolate(flow1, scale_factor=2.0)
