@@ -100,7 +100,7 @@ class ExpandingBlock(nn.Module):
         f2_4, f2_2, f2_1 = f_prv
         m2_4, m2_2, m2_1 = m_prv
         d2_4, d2_2, d2_1 = d_prv
-        outputsD, outputsS = list(), list()
+        outputsD, outputsS, outputsOF = list(), list(), list()
 
         ################################ SCALE 4 ######################################
 
@@ -117,7 +117,7 @@ class ExpandingBlock(nn.Module):
         ### Flow
         off4 = self.of_est4(self.FAH[0](f1_4, m1_4, d1_4), self.FAH[0](f2_4, m2_4, d2_4)) # offsets 200x200 feature res 200x200
         off4_up = F.interpolate(off4, scale_factor=2.0) * 2.0
-        outputsOF = F.interpolate(off4, (800, 800))*4.0
+        outputsOF.append(F.interpolate(off4, (800, 800))*4.0)
 
         wf2_2 = warp_flow(f2_2, off4_up)
 
@@ -139,6 +139,8 @@ class ExpandingBlock(nn.Module):
         outputsS.append(m1_2)
 
         off2_up = F.interpolate(off4, scale_factor=4) * 4.0
+
+
         wf2_1 = warp_flow(f2_1, off2_up)
 
         ################################ SCALE 1 ######################################
