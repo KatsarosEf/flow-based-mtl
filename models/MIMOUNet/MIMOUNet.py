@@ -166,9 +166,9 @@ class ExpandingBlock(nn.Module):
         m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up, off2_up], 1)) + m1_2_up
         outputsS.append(m1_1)
 
-        ### Flow
-        off = self.of_est(self.FAH[0](f1_1, m1_1, d1_1), self.FAH[0](wf2_1, wm2_1, wd2_1))
-        outputsOF.append(off)
+        # ### Flow
+        # off = self.of_est(self.FAH[0](f1_1, m1_1, d1_1), self.FAH[0](wf2_1, wm2_1, wd2_1))
+        # outputsOF.append(off)
 
         return [outputsS, outputsD, outputsOF]
 
