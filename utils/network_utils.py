@@ -82,34 +82,50 @@ def model_load(path, model, optimizer=None, scheduler=None):
 
 
 def measure_efficiency(args):
+    import sys
+    sys.path.append('core')
+    from raft import RAFT
+    from argparse import ArgumentParser
+    from fvcore.nn import FlopCountAnalysis
 
-    from models.MIMOUNet.MIMOUNet_fake import VideoMIMOUNet_fake
+    parser = ArgumentParser(description='Parser of Training Arguments')
 
-    model = VideoMIMOUNet_fake(['segment', 'deblur', 'homography'], nr_blocks=args.nr_blocks, block=args.block).to(args.device)
+    parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
+
+    parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
+    parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
+    parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
+
+    parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
+    parser.add_argument('--wdecay', type=float, default=.0005)
+    parser.add_argument('--epsilon', type=float, default=1e-8)
+    parser.add_argument('--clip', type=float, default=0.8)
+    parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
+    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
+    parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
+    parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=150, type=int)
+    parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
+    parser.add_argument("--device", dest='device', default="cuda", type=str)
+
+
+
+    args = parser.parse_args()
+
+    model = RAFT(args, ['flow']).to(args.device)
     dims = 800, 800
     x1, x2 = [torch.randn((1, 3, *dims)).cuda(non_blocking=True), torch.randn((1, 3, *dims)).cuda(non_blocking=True)]
-    m2 = [torch.rand((x1.shape[0], 2, 200, 200), device='cuda'),
-          torch.rand((x1.shape[0], 2, 400, 400), device='cuda'),
-          torch.rand((x1.shape[0], 2, 800, 800), device='cuda')]
-    d2 = [torch.rand((x1.shape[0], 3, 200, 200), device='cuda'),
-          torch.rand((x1.shape[0], 3, 400, 400), device='cuda'),
-          torch.rand((x1.shape[0], 3, 800, 800), device='cuda')]
-
     times = []
     with torch.no_grad():
         for i in range(60):
             torch.cuda.synchronize()
             test_time_start = time.time()
-            _ = model.forward(x1, x2, m2, d2)
+            _ = model.forward(x1, x2)
             torch.cuda.synchronize()
             times.append(time.time() - test_time_start)
 
     fps = round(1 / (sum(times[30:])/len(times[30:])), 2)
     params = count_parameters(model) / 10 ** 6
-    flops = FlopCountAnalysis(model, (x1, x2, m2, d2)).total() * 1e-9
+    flops = FlopCountAnalysis(model, (x1, x2)).total() * 1e-9
     del model
     return params, fps, flops
-
-
-def warp(image, homography):
-    return kornia.geometry.warp_perspective(image, homography, image.shape[-2:])

@@ -11,8 +11,7 @@ from losses import OpticalFlowLoss
 from metrics import OpticalFlowMetrics
 from utils.transforms import ToTensor, Normalize, RandomHorizontalFlip, RandomVerticalFlip, RandomColorChannel,\
     ColorJitter
-from utils.network_utils import model_save, model_load, gridify
-import torch.nn.functional as F
+from utils.network_utils import model_save, model_load, measure_efficiency
 import sys
 sys.path.append('core')
 from raft import RAFT
@@ -183,8 +182,8 @@ def main(args):
 
 
     model = RAFT(args, tasks).to(args.device)
-    # params, fps, flops = measure_efficiency(args)
-    # print(params, fps, flops)
+    params, fps, flops = measure_efficiency(args)
+    print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
     optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
