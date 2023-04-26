@@ -101,7 +101,7 @@ class HomoEstimator2(nn.Module):
         super(HomoEstimator2,self).__init__()
 
         self.batchNorm = True
-        self.conv2   = conv(self.batchNorm, 128,  128, stride=2)
+        self.conv2   = conv(self.batchNorm, 128,  256, stride=2)
         self.conv3   = conv(self.batchNorm, 256,  256, stride=2)
         self.conv4   = conv(self.batchNorm, 256,  512, stride=2)
         self.conv5   = conv(self.batchNorm, 512,  512, stride=2)
@@ -109,15 +109,20 @@ class HomoEstimator2(nn.Module):
         self.deconv4 = deconv(512,256)
         self.deconv3 = deconv(770,128)
         self.deconv2 = deconv(386,64)
+        self.deconv1 = deconv(322, 32)
 
         self.predict_flow5 = predict_flow(512)
         self.predict_flow4 = predict_flow(770) # 512 + 256 + 2
         self.predict_flow3 = predict_flow(386) # 256 + 128 + 2
-        self.predict_flow2 = predict_flow(66)  # 64        + 2
+        self.predict_flow2 = predict_flow(322)  # 64        + 2
+        self.predict_flow1 = predict_flow(34)  # 64        + 2
+
 
         self.upsampled_flow5_to_4 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
         self.upsampled_flow4_to_3 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
         self.upsampled_flow3_to_2 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
+        self.upsampled_flow2_to_1 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
+
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
@@ -152,13 +157,12 @@ class HomoEstimator2(nn.Module):
         concat2 = torch.cat((out_conv2,out_deconv2,flow3_up),1)
         flow2       = self.predict_flow2(concat2)
         flow2_up    = self.upsampled_flow2_to_1(flow2)
-        out_deconv1 = self.deconv2(concat3)
-
+        out_deconv1 = self.deconv1(concat2)
 
         concat1 = torch.cat((out_deconv1,flow2_up),1)
         flow1 = self.predict_flow1(concat1)
 
-        return flow2
+        return flow1
 
 class HomoEstimator(nn.Module):
     def __init__(self):

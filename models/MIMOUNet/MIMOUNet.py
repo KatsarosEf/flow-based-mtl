@@ -1,5 +1,5 @@
 from models.MIMOUNet.layers import *
-from models.HomoEstimator import HomoEstimator4
+from models.HomoEstimator import HomoEstimator4, HomoEstimator2, HomoEstimator
 from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
@@ -63,6 +63,8 @@ class ExpandingBlock(nn.Module):
         base_channel = 32
 
         self.of_est4 = HomoEstimator4()
+        self.of_est2 = HomoEstimator2()
+        self.of_est = HomoEstimator()
 
         self.Decoder = nn.ModuleList([
             DBlock(base_channel * 4, 2, name=block),
@@ -120,6 +122,8 @@ class ExpandingBlock(nn.Module):
         outputsOF.append(F.interpolate(off4, (800, 800))*4.0)
 
         wf2_2 = warp_flow(f2_2, off4_up)
+        wm2_2 = warp_flow(m2_2, off4_up)
+        wd2_2 = warp_flow(d2_2, off4_up)
 
 
         ################################ SCALE 2 ######################################
@@ -138,10 +142,13 @@ class ExpandingBlock(nn.Module):
         m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up, off4_up], 1)) + m1_4_up
         outputsS.append(m1_2)
 
-        off2_up = F.interpolate(off4, scale_factor=4) * 4.0
-
+        off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
+        off2_up = F.interpolate(off2, scale_factor=2.0) * 2.0
+        outputsOF.append(off2_up)
 
         wf2_1 = warp_flow(f2_1, off2_up)
+        wm2_1 = warp_flow(m2_1, off2_up)
+        wd2_1 = warp_flow(d2_1, off2_up)
 
         ################################ SCALE 1 ######################################
 
@@ -159,7 +166,9 @@ class ExpandingBlock(nn.Module):
         m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up, off2_up], 1)) + m1_2_up
         outputsS.append(m1_1)
 
-
+        ### Flow
+        off = self.of_est(self.FAH[0](f1_1, m1_1, d1_1), self.FAH[0](wf2_1, wm2_1, wd2_1))
+        outputsOF.append(off)
 
         return [outputsS, outputsD, outputsOF]
 
