@@ -84,6 +84,7 @@ def model_load(path, model, optimizer=None, scheduler=None):
 def measure_efficiency(args):
 
     from models.MIMOUNet.FlowNet import FlowNetS
+    from fvcore.nn import FlopCountAnalysis
 
     model = FlowNetS(args, ['flow'], nr_blocks=args.nr_blocks, block=args.block).to('cuda')
     dims = 800, 800
@@ -100,6 +101,6 @@ def measure_efficiency(args):
 
     fps = round(1 / (sum(times[30:])/len(times[30:])), 2)
     params = count_parameters(model) / 10 ** 6
+    flops = FlopCountAnalysis(model, (x1, x2)).total() * 1e-9
     del model
-    return params, fps
-
+    return params, fps, flops

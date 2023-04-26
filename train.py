@@ -7,12 +7,11 @@ from utils.dataset import MTL_Dataset
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
-from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
+from losses import OpticalFlowLoss
+from metrics import OpticalFlowMetrics
 from models.MIMOUNet.FlowNet import FlowNetS
 from utils.transforms import *
-from utils.network_utils import model_save, model_load, gridify
-import torch.nn.functional as F
+from utils.network_utils import model_save, model_load, gridify, measure_efficiency
 
 task_weights = {'segment': 0,
                 'deblur': 0,
@@ -160,8 +159,8 @@ def main(args):
 
 
     model = FlowNetS(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
-    # params, fps, flops = measure_efficiency(args)
-    # print(params, fps, flops)
+    params, fps, flops = measure_efficiency(args)
+    print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
@@ -198,12 +197,12 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str) # # ../raid/data_ours_new_split
-    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str) # # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/debug-ecai-mtl', type=str)
 
-
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./dblab_ecai', type=str) # # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='./ecai-flownet-augme', type=str)
+    #
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./dblab_ecai', type=str) # # ../raid/data_ours_new_split
+    # parser.add_argument('--out', dest='out', help='Set output path', default='./ecai-flownet-augme', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
