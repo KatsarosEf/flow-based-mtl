@@ -117,7 +117,6 @@ class HomoEstimator2(nn.Module):
         self.predict_flow2 = predict_flow(322)  # 64        + 2
         self.predict_flow1 = predict_flow(34)  # 64        + 2
 
-
         self.upsampled_flow5_to_4 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
         self.upsampled_flow4_to_3 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
         self.upsampled_flow3_to_2 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
@@ -165,43 +164,71 @@ class HomoEstimator2(nn.Module):
         return flow1
 
 class HomoEstimator(nn.Module):
-    def __init__(self):
-        super(HomoEstimator, self).__init__()
+    expansion = 1
+    def __init__(self,):
+        super(HomoEstimator,self).__init__()
 
-        self.conv2 = torch.nn.Sequential(nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(64),
-                                         nn.ReLU(inplace=True),
-                                         nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(64),
-                                         nn.ReLU(inplace=True),
-                                         nn.MaxPool2d(3, stride=2, padding=1))
+        self.batchNorm = True
+        self.conv1   = conv(self.batchNorm, 64,   128, stride=2)
+        self.conv2   = conv(self.batchNorm, 128,  256, stride=2)
+        self.conv3   = conv(self.batchNorm, 256,  256, stride=2)
+        self.conv4   = conv(self.batchNorm, 256,  512, stride=2)
+        self.conv5   = conv(self.batchNorm, 512,  512, stride=2)
 
-        self.conv3 = torch.nn.Sequential(nn.Conv2d(64, 32, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(32),
-                                         nn.ReLU(inplace=True),
-                                         nn.Conv2d(32, 16, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(16),
-                                         nn.ReLU(inplace=True),
-                                         nn.Conv2d(16, 16, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(16),
-                                         nn.ReLU(inplace=True),
-                                         nn.MaxPool2d(3, stride=2, padding=1)
-                                         )
+        self.deconv4 = deconv(512,256)
+        self.deconv3 = deconv(770,128)
+        self.deconv2 = deconv(386,64)
+        self.deconv1 = deconv(322, 32)
 
-        self.conv4 = torch.nn.Sequential(nn.Conv2d(16, 16, kernel_size=3, padding=1, bias=False),
-                                         nn.BatchNorm2d(16),
-                                         nn.ReLU(inplace=True)
-                                         )
+        self.predict_flow5 = predict_flow(512)
+        self.predict_flow4 = predict_flow(770) # 512 + 256 + 2
+        self.predict_flow3 = predict_flow(386) # 256 + 128 + 2
+        self.predict_flow2 = predict_flow(322)  # 64        + 2
+        self.predict_flow1 = predict_flow(34)  # 64        + 2
 
-        self.head = torch.nn.Sequential(nn.Conv2d(16, 2, kernel_size=3, padding=1))
-
-    def forward(self, m1, m2):
-        x = self.conv2(torch.cat([m1, m2], 1)) # 260 x 80 x 106 -> 256 x 40 x 53
-        x = self.conv3(x)  # 256 x 40 x 53 -> 256 x 20 x 26
-        x = self.conv4(x) # 256 x 20 x 26 -> 256 x 10 x 13
-        x = self.head(x)  # 256 x 20 x 26 -> 1 x 8 x 1
-        x = torch.nn.functional.interpolate(x, (800, 800))
-        return x
+        self.upsampled_flow5_to_4 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
+        self.upsampled_flow4_to_3 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
+        self.upsampled_flow3_to_2 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
+        self.upsampled_flow2_to_1 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
 
 
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                kaiming_normal_(m.weight, 0.1)
+                if m.bias is not None:
+                    constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                constant_(m.weight, 1)
+                constant_(m.bias, 0)
 
+    def forward(self, x2, x1):
+        x = torch.cat([x2, x1], 1)
+        out_conv1 = self.conv1(x)
+        out_conv2 = self.conv2(out_conv1)
+        out_conv3 = self.conv3(out_conv2)
+        out_conv4 = self.conv4(out_conv3)
+        out_conv5 = self.conv5(out_conv4)
+
+        flow5       = self.predict_flow5(out_conv5)  # 2 x 512 x 25 x 25   ->   2 x 2 x 25 x 25
+        flow5_up    = crop_like(self.upsampled_flow5_to_4(flow5), out_conv4)  #  2 x 2 x 50 x 50   ->   2 x 2 x 50 x 50
+        out_deconv4 = crop_like(self.deconv4(out_conv5), out_conv4)  # 2 x 256 x 50 x 50  ->   2 x 2 x 50 x 50
+
+        concat4 = torch.cat((out_conv4,out_deconv4,flow5_up),1)
+        flow4       = self.predict_flow4(concat4)
+        flow4_up    = crop_like(self.upsampled_flow4_to_3(flow4), out_conv3)
+        out_deconv3 = crop_like(self.deconv3(concat4), out_conv3)
+
+        concat3 = torch.cat((out_conv3,out_deconv3,flow4_up),1)
+        flow3       = self.predict_flow3(concat3)
+        flow3_up    = self.upsampled_flow3_to_2(flow3)
+        out_deconv2 = self.deconv2(concat3)
+
+        concat2 = torch.cat((out_conv2,out_deconv2,flow3_up),1)
+        flow2       = self.predict_flow2(concat2)
+        flow2_up    = self.upsampled_flow2_to_1(flow2)
+        out_deconv1 = self.deconv1(concat2)
+
+        concat1 = torch.cat((out_deconv1,flow2_up),1)
+        flow1 = self.predict_flow1(concat1)
+
+        return flow1
