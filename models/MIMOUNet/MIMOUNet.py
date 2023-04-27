@@ -64,6 +64,8 @@ class ExpandingBlock(nn.Module):
 
         self.of_est4 = HomoEstimator4()
         self.of_est2 = HomoEstimator2()
+        self.of_est = HomoEstimator()
+
 
         self.Decoder = nn.ModuleList([
             DBlock(base_channel * 4, 2, name=block),
