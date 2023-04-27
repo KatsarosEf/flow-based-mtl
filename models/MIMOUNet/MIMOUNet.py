@@ -64,7 +64,6 @@ class ExpandingBlock(nn.Module):
 
         self.of_est4 = HomoEstimator4()
         self.of_est2 = HomoEstimator2()
-        self.of_est = HomoEstimator()
 
         self.Decoder = nn.ModuleList([
             DBlock(base_channel * 4, 2, name=block),
@@ -89,8 +88,7 @@ class ExpandingBlock(nn.Module):
 
         self.FAH = nn.ModuleList(
             [FAM_homo(base_channel * 4),
-             FAM_homo(base_channel * 2),
-             FAM_homo(base_channel)])
+             FAM_homo(base_channel * 2)])
 
         self.feat_extract = nn.ModuleList([
             BasicConv(base_channel*4, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=True),
