@@ -1,5 +1,5 @@
 from models.MIMOUNet.layers import *
-from models.HomoEstimator import HomoEstimator4
+from models.HomoEstimator import HomoEstimator4, HomoEstimator2, HomoEstimator
 from utils.network_utils import warp_flow
 import torch.nn.functional as F
 
@@ -87,8 +87,7 @@ class ExpandingBlock(nn.Module):
 
         self.FAH = nn.ModuleList(
             [FAM_homo(base_channel * 4),
-             FAM_homo(base_channel * 2),
-             FAM_homo(base_channel)])
+             FAM_homo(base_channel * 2)])
 
         self.feat_extract = nn.ModuleList([
             BasicConv(base_channel*4, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=True),
@@ -100,7 +99,7 @@ class ExpandingBlock(nn.Module):
         f2_4, f2_2, f2_1 = f_prv
         m2_4, m2_2, m2_1 = m_prv
         d2_4, d2_2, d2_1 = d_prv
-        outputsD, outputsS, outputsOF = list(), list(), list()
+        outputsD, outputsS = list(), list()
 
         ################################ SCALE 4 ######################################
 
@@ -117,9 +116,11 @@ class ExpandingBlock(nn.Module):
         ### Flow
         off4 = self.of_est4(self.FAH[0](f1_4, m1_4, d1_4), self.FAH[0](f2_4, m2_4, d2_4)) # offsets 200x200 feature res 200x200
         off4_up = F.interpolate(off4, scale_factor=2.0) * 2.0
-        outputsOF.append(F.interpolate(off4, (800, 800))*4.0)
+        outputsOF = F.interpolate(off4, (800, 800))*4.0
 
         wf2_2 = warp_flow(f2_2, off4_up)
+        wm2_2 = warp_flow(m2_2, off4_up)
+        wd2_2 = warp_flow(d2_2, off4_up)
 
 
         ################################ SCALE 2 ######################################
@@ -138,10 +139,11 @@ class ExpandingBlock(nn.Module):
         m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up, off4_up], 1)) + m1_4_up
         outputsS.append(m1_2)
 
-        off2_up = F.interpolate(off4, scale_factor=4) * 4.0
-
+        off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
+        off2_up = F.interpolate(off2, scale_factor=2.0) * 2.0
 
         wf2_1 = warp_flow(f2_1, off2_up)
+
 
         ################################ SCALE 1 ######################################
 
@@ -158,8 +160,6 @@ class ExpandingBlock(nn.Module):
         m1_2_up = F.interpolate(m1_2, scale_factor=2)
         m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up, off2_up], 1)) + m1_2_up
         outputsS.append(m1_1)
-
-
 
         return [outputsS, outputsD, outputsOF]
 
