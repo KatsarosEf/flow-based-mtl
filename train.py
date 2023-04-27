@@ -14,12 +14,12 @@ from utils.transforms import ToTensor, Normalize, ColorJitter, RandomColorChanne
 from utils.network_utils import model_save, model_load, gridify, measure_efficiency
 import torch.nn.functional as F
 
-task_weights = {'segment': 0,
-                'deblur': 0,
+task_weights = {'segment': 1,
+                'deblur': 10,
                 'flow': 10}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
 
 
 def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_dict, epoch):
@@ -151,7 +151,9 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([ToTensor(), Normalize()]),
+    transformations = {'train': transforms.Compose([ColorJitter(), RandomColorChannel(),
+                                                    RandomHorizontalFlip(), RandomVerticalFlip(),
+                                                    ToTensor(), Normalize(), ]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
@@ -214,15 +216,14 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str)
-    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-fw', type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str)
+    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl-overfit-debug', type=str)
 
     parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-fw', type=str)
-
+    parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-mostnet-fw', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
-    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=2, type=int)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
@@ -233,7 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.9)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--bs', help='Set size of the batch size', default=8, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=150, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
