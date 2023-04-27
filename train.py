@@ -178,8 +178,8 @@ def main(args):
 
 
     model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
-    # params, fps, flops = measure_efficiency(args)
-    # print(params, fps, flops)
+    params, fps, flops = measure_efficiency(args)
+    print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
@@ -214,8 +214,11 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/overfit', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl-overfit-debug', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-fw', type=str)
+
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./dblab_ecai', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='./ecai-mtl-fw', type=str)
 
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
@@ -230,13 +233,13 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.9)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=8, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=150, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
-    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=400, type=int)
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=150, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
