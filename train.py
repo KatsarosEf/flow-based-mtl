@@ -217,8 +217,8 @@ if __name__ == '__main__':
     # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str)
     # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-fw', type=str)
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./dblab_ecai', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='./ecai-mtl-fw', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-fw', type=str)
 
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
