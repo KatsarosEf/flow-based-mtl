@@ -184,12 +184,14 @@ class HomoEstimator(nn.Module):
         self.predict_flow4 = predict_flow(770) # 512 + 256 + 2
         self.predict_flow3 = predict_flow(386) # 256 + 128 + 2
         self.predict_flow2 = predict_flow(322)  # 64        + 2
-        self.predict_flow1 = predict_flow(34)  # 64        + 2
+        self.predict_flow1 = predict_flow(162)  # 64        + 2
 
         self.upsampled_flow5_to_4 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
         self.upsampled_flow4_to_3 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
         self.upsampled_flow3_to_2 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
         self.upsampled_flow2_to_1 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
+        self.upsampled_flow1_to_0 = nn.ConvTranspose2d(2, 2, 4, 2, 1, bias=False)
+
 
 
         for m in self.modules():
@@ -228,7 +230,8 @@ class HomoEstimator(nn.Module):
         flow2_up    = self.upsampled_flow2_to_1(flow2)
         out_deconv1 = self.deconv1(concat2)
 
-        concat1 = torch.cat((out_deconv1,flow2_up),1)
+        concat1 = torch.cat((out_conv1,out_deconv1,flow2_up),1)
         flow1 = self.predict_flow1(concat1)
+        flow1_up =  self.upsampled_flow1_to_0(flow1)
 
-        return torch.nn.functional.interpolate(flow1, scale_factor=2.0)
+        return flow1_up
