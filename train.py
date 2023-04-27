@@ -214,8 +214,8 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-fw', type=str)
+    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str)
+    # parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-fw', type=str)
 
     parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='./dblab_ecai', type=str)
     parser.add_argument('--out', dest='out', help='Set output path', default='./ecai-mtl-fw', type=str)
