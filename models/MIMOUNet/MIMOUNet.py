@@ -86,8 +86,7 @@ class ExpandingBlock(nn.Module):
              DD(base_channel * 1)])
 
         self.FAH = nn.ModuleList(
-            [FAM_homo(base_channel * 4),
-             FAM_homo(base_channel * 2)])
+            [FAM_homo(base_channel * 4)])
 
         self.feat_extract = nn.ModuleList([
             BasicConv(base_channel*4, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=True),
@@ -197,7 +196,7 @@ if __name__ == "__main__":
     parser.add_argument('--out', dest='out', help='Set output path', default='./debug-ecai-mtl', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
-    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
