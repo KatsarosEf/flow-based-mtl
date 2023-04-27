@@ -14,12 +14,12 @@ from utils.transforms import ToTensor, Normalize, ColorJitter, RandomColorChanne
 from utils.network_utils import model_save, model_load, gridify, measure_efficiency
 import torch.nn.functional as F
 
-task_weights = {'segment': 1,
-                'deblur': 10,
+task_weights = {'segment': 0,
+                'deblur': 0,
                 'flow': 10}
 os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-#os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,0"
 
 
 def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_dict, epoch):
@@ -178,8 +178,8 @@ def main(args):
 
 
     model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
-    params, fps, flops = measure_efficiency(args)
-    print(params, fps, flops)
+    # params, fps, flops = measure_efficiency(args)
+    # print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
@@ -197,7 +197,7 @@ def main(args):
         else:
             os.makedirs(os.path.join(args.out, 'models'), exist_ok=True)
 
-    wandb.init(project='mtl-normal', entity='dst-cv', mode='disabled')
+    wandb.init(project='mtl-normal', entity='dst-cv')
     wandb.run.name = args.out.split('/')[-1]
     wandb.watch(model)
 
@@ -221,7 +221,7 @@ if __name__ == '__main__':
     # parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-flownet_dw', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
-    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=2, type=int)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
@@ -232,13 +232,13 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.9)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--bs', help='Set size of the batch size', default=1, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=150, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
-    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=130, type=int)
+    parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=400, type=int)
     parser.add_argument('--save_every', help='Save model every n epochs', default=1, type=int)
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
     parser.add_argument('--resume_epoch', dest='resume_epoch', help='Number of epoch to resume', default=0, type=int)
