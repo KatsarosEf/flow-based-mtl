@@ -90,7 +90,9 @@ class ExpandingBlock(nn.Module):
 
         self.FAH = nn.ModuleList(
             [FAM_homo(base_channel * 4),
-             FAM_homo(base_channel * 2)])
+             FAM_homo(base_channel * 2),
+             FAM_homo(base_channel * 1)]
+        )
 
         self.feat_extract = nn.ModuleList([
             BasicConv(base_channel*4, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=True),
