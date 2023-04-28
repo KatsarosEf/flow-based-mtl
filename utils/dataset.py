@@ -128,7 +128,6 @@ class MTL_Dataset(data.Dataset):
         if self.transform is not None:
             sample = self.transform(sample)
 
-
         return sample
 
     def _load_img(self, index):
@@ -228,17 +227,10 @@ class MTL_TestDataset(data.Dataset):
                             assert os.path.isfile(_optical_flow)
                             seq_flows.append(_optical_flow)
 
-
-
                 self.images.append(seq_images)
                 self.masks.append(seq_masks)
                 self.deblur_frames.append(seq_deblur_frames)
                 self.flows.append(seq_flows)
-
-        # if seq_len is None:
-        #     return
-        # Uncomment to overfit to one sequence
-
 
         # Display stats
         print('Number of {} dataset sequences: {:d}'.format(self.split, len(self.images)))
@@ -255,7 +247,7 @@ class MTL_TestDataset(data.Dataset):
         if self.do_deblur:
             sample['deblur'] = self._load_deblur(index)
 
-        if self.do_homo:
+        if self.do_flow:
             sample['flow'] = self._load_flow(index)
 
         if self.meta:
@@ -277,8 +269,8 @@ class MTL_TestDataset(data.Dataset):
     def _load_mask(self, index):
         return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.masks[index]]
 
-    def _load_homo(self, index):
-        return [np.load(path).astype(np.float32) for path in self.flows[index]]
+    def _load_flow(self, index):
+        return [np.load(path).astype(np.float32) for path in self.flows[index]] # need to process flow to
 
     def __len__(self):
         return len(self.images)

@@ -10,7 +10,7 @@ from torchvision import transforms
 from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
 from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
-from utils.transforms import ToTensor, Normalize, ColorJitter, RandomColorChannel, RandomHorizontalFlip, RandomVerticalFlip
+from utils.transforms import ToTensor, Normalize
 from utils.network_utils import model_save, model_load, gridify, measure_efficiency
 import torch.nn.functional as F
 
@@ -178,8 +178,8 @@ def main(args):
 
 
     model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
-    params, fps = measure_efficiency(args)
-    print(params, fps)
+    params, fps, flops = measure_efficiency(args)
+    print(params, fps, flops)
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)

@@ -121,7 +121,6 @@ class ExpandingBlock(nn.Module):
 
         wf2_2 = warp_flow(f2_2, off4_up)
 
-
         ################################ SCALE 2 ######################################
 
         ### Deblurring
@@ -156,8 +155,6 @@ class ExpandingBlock(nn.Module):
         m1_2_up = F.interpolate(m1_2, scale_factor=2)
         m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up, off2_up], 1)) + m1_2_up
         outputsS.append(m1_1)
-
-
 
         return [outputsS, outputsD, outputsOF]
 
