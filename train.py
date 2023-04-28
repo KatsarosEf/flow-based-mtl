@@ -10,7 +10,7 @@ from torchvision import transforms
 from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
 from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
-from utils.transforms import ToTensor, Normalize, ColorJitter, RandomColorChannel, RandomHorizontalFlip, RandomVerticalFlip
+from utils.transforms import ToTensor, Normalize
 from utils.network_utils import model_save, model_load, gridify, measure_efficiency
 import torch.nn.functional as F
 
@@ -151,9 +151,7 @@ def main(args):
 
     tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
-    transformations = {'train': transforms.Compose([ColorJitter(), RandomColorChannel(),
-                                                    RandomHorizontalFlip(), RandomVerticalFlip(),
-                                                    ToTensor(), Normalize(), ]),
+    transformations = {'train': transforms.Compose([ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
 
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
@@ -185,7 +183,7 @@ def main(args):
 
     model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0.5*1e-6)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
     if args.resume:
         checkpoint_file_name = 'ckpt_{}.pth'.format(args.resume_epoch) if args.resume_epoch else 'ckpt.pth'
