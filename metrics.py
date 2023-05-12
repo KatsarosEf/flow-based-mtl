@@ -118,12 +118,11 @@ class OpticalFlowMetrics(Module):
 	def __init__(self):
 		super(OpticalFlowMetrics, self).__init__()
 		self.metrics = {
-			'EPE': EPE(),
-		}
+			'EPE': EPE()}
 
 	def forward(self, output, gt):
 		with torch.no_grad():
-			metric_results = {metric: metric_function(output, gt) for metric, metric_function in self.metrics.items()}
+			metric_results = {metric: metric_function(output, gt) for num, (metric, metric_function) in enumerate(self.metrics.items())}
 		return metric_results
 
 

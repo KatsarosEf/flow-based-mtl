@@ -12,9 +12,9 @@ from torchvision import transforms
 from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize
-from utils.network_utils import model_load
 import cv2, kornia
 import torch.nn.functional as F
+from torchvision.utils import flow_to_image
 
 
 def save_outputs(args, seq_name, name, output_dict):
@@ -25,6 +25,10 @@ def save_outputs(args, seq_name, name, output_dict):
     cv2.imwrite('{}/{}'.format(os.path.join(args.out, seq_name, 'images'), name[:-4]+'.png'),
                 output_dict['deblur'][2][0].permute(1,2,0).cpu().numpy()*255.0)
     ## flows
+    cv2.imwrite('{}/{}'.format(os.path.join(args.out, seq_name, 'flows'), name[:-4] + '.png'),
+                flow_to_image(output_dict['flow'])[0].permute(1, 2, 0).cpu().numpy())
+
+
 
 
 
@@ -35,7 +39,7 @@ def evaluate(args, dataloader, model, metrics_dict):
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
     metric_cumltive = {k: [] for k in metrics}
     metrics_hl = {k: [] for k in metrics}
-    model.eval()
+    model.train()
 
     l = ["f793c363-b270-4e47-b8c6-03752a9b56f6_GT_2606.png",
 "a0a71e0a-9ad2-4263-b8fc-8381d4efabc0_GT_2687.png",
@@ -649,6 +653,7 @@ def evaluate(args, dataloader, model, metrics_dict):
 
         os.makedirs(os.path.join(args.out, seq_name, 'masks'), exist_ok=True)
         os.makedirs(os.path.join(args.out, seq_name, 'images'), exist_ok=True)
+        os.makedirs(os.path.join(args.out, seq_name, 'flows'), exist_ok=True)
         results = open(os.path.join(args.out, seq_name, 'results.txt'), 'w')
 
         for frame in tqdm(range(args.prev_frames, len(seq['meta']['paths']))):
@@ -676,8 +681,6 @@ def evaluate(args, dataloader, model, metrics_dict):
 
             name = seq['meta']['paths'][frame][0].split('/')[-1]
             save_outputs(args, seq_name, name, outputs)
-
-
             m2 = outputs['segment']
             d2 = outputs['deblur']
 
@@ -690,11 +693,10 @@ def evaluate(args, dataloader, model, metrics_dict):
                 if path[0] in l:
                     metrics_hl[metric].append(metrics_values[metric])
 
-
             results.write(
-                '\nFrame {}, PSNR: {:.3f},  SSIM: {:.3f}, MACE: {:.3f}, MACE_m: {:.3f}, MACE_l: {:.3f} IoU: {:.3f} DiCE: {:.3f} IoU_HL: - DiCE_HL: -\n'.format(
+                '\nFrame {}, PSNR: {:.3f},  SSIM: {:.3f}, EPE: {:.3f}, IoU: {:.3f} DiCE: {:.3f} IoU_HL: - DiCE_HL: -\n'.format(
                     name, metrics_values['psnr'], metrics_values['ssim'],
-                    metrics_values['MACE'], metrics_values['MACE_med'], metrics_values['MACE_low'],
+                    metrics_values['EPE'],
                     metrics_values['iou'], metrics_values['dice']))
 
         results.close()
@@ -735,7 +737,7 @@ def main(args):
     model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
     model = torch.nn.DataParallel(model).to(args.device)
     # Load checkpoint
-    resume_path = os.path.join(args.out, 'ckpt_{}.pth'.format(70)) #79
+    resume_path = os.path.join(args.out, 'ckpt_{}.pth'.format(70))
     state_dict = torch.load(resume_path)['state']
     model.load_state_dict(state_dict, strict=True)
 
@@ -752,7 +754,7 @@ if __name__ == '__main__':
     parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
     parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/RESULTS-ECAI/mostnet-sw/', type=str)
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
-    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
+    parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
