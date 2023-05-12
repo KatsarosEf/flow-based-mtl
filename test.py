@@ -2,34 +2,30 @@ import os
 import torch
 import tqdm
 import wandb
-import numpy as np
 from tqdm import tqdm
-from torchmetrics.functional import ssim
 
 from argparse import ArgumentParser
 from utils.dataset import MTL_TestDataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from metrics import SegmentationMetrics, DeblurringMetrics, HomographyMetrics, PSNR_masked
+from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize
-from utils.network_utils import model_load, offsets2homo
+from utils.network_utils import model_load
 import cv2, kornia
 import torch.nn.functional as F
 
 
 def save_outputs(args, seq_name, name, output_dict):
     #masks
-    # cv2.imwrite('{}/{}'.format(os.path.join(args.out, seq_name, 'masks'), name),
-    #             torch.argmax(output_dict['segment'][2], 1)[0].cpu().numpy() * 255.0)
+    cv2.imwrite('{}/{}'.format(os.path.join(args.out, seq_name, 'masks'), name),
+                torch.argmax(output_dict['segment'][2], 1)[0].cpu().numpy() * 255.0)
     # #images
-    # cv2.imwrite('{}/{}'.format(os.path.join(args.out, seq_name, 'images'), name[:-4]+'.png'),
-    #             output_dict['deblur'][2][0].permute(1,2,0).cpu().numpy()*255.0)
-    #homographies
-    homos = [offsets2homo(output_dict['homography'][num]*(2**(2-num)), 80 * (4), 104 * (4)) for num in range(3)]
+    cv2.imwrite('{}/{}'.format(os.path.join(args.out, seq_name, 'images'), name[:-4]+'.png'),
+                output_dict['deblur'][2][0].permute(1,2,0).cpu().numpy()*255.0)
+    ## flows
 
-    return homos[0].cpu().numpy(), homos[1].cpu().numpy(), homos[2].cpu().numpy()
 
 
 
@@ -650,11 +646,10 @@ def evaluate(args, dataloader, model, metrics_dict):
 
         seq_name = seq['meta']['paths'][0][0].split('/')[-3]
         print(seq_name)
-        # os.makedirs(os.path.join(args.out, seq_name, 'masks'), exist_ok=True)
-        # os.makedirs(os.path.join(args.out, seq_name, 'images'), exist_ok=True)
-        #
-        # results = open(os.path.join(args.out, seq_name, 'results.txt'), 'w')
-        # homos_seq_0, homos_seq_1, homos_seq_2 = [], [], []
+
+        os.makedirs(os.path.join(args.out, seq_name, 'masks'), exist_ok=True)
+        os.makedirs(os.path.join(args.out, seq_name, 'images'), exist_ok=True)
+        results = open(os.path.join(args.out, seq_name, 'results.txt'), 'w')
 
         for frame in tqdm(range(args.prev_frames, len(seq['meta']['paths']))):
 
@@ -680,13 +675,12 @@ def evaluate(args, dataloader, model, metrics_dict):
             outputs = dict(zip(tasks, outputs))
 
             name = seq['meta']['paths'][frame][0].split('/')[-1]
-            homo0, homo1, homo2 = save_outputs(args, seq_name, name, outputs)
-            # homos_seq_0.append(homo0)
-            # homos_seq_1.append(homo1)
-            # homos_seq_2.append(homo2)
+            save_outputs(args, seq_name, name, outputs)
+
 
             m2 = outputs['segment']
             d2 = outputs['deblur']
+
             task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
             metrics_values = {k: torch.round((10**3 * v))/(10**3) for task in tasks for k, v in task_metrics[task].items()}
 
@@ -696,26 +690,14 @@ def evaluate(args, dataloader, model, metrics_dict):
                 if path[0] in l:
                     metrics_hl[metric].append(metrics_values[metric])
 
-        #     if path[0] in l:
-        #         results.write(
-        #             '\nFrame {}, PSNR: {:.3f}, SSIM: {:.3f}, MACE: {:.3f}, MACE_m: {:.3f}, MACE_l: {:.3f} IoU: {:.3f} DiCE: {:.3f} IoU_HL: {:.3f} - DiCE_HL: {:.3f} -\n'.format(
-        #                 name, metrics_values['psnr'], metrics_values['ssim'],
-        #                 metrics_values['MACE'], metrics_values['MACE_med'], metrics_values['MACE_low'],
-        #                 metrics_values['iou'], metrics_values['dice'], metrics_values['iou'], metrics_values['dice']))
-        #     else:
-        #         results.write(
-        #             '\nFrame {}, PSNR: {:.3f},  SSIM: {:.3f}, MACE: {:.3f}, MACE_m: {:.3f}, MACE_l: {:.3f} IoU: {:.3f} DiCE: {:.3f} IoU_HL: - DiCE_HL: -\n'.format(
-        #                 name, metrics_values['psnr'], metrics_values['ssim'],
-        #                 metrics_values['MACE'], metrics_values['MACE_med'], metrics_values['MACE_low'],
-        #                 metrics_values['iou'], metrics_values['dice']))
-        #
-        # np.save(os.path.join(args.out, seq_name, 'homos0.npy'), np.concatenate(homos_seq_0, 0))
-        # np.save(os.path.join(args.out, seq_name, 'homos1.npy'), np.concatenate(homos_seq_1, 0))
-        # np.save(os.path.join(args.out, seq_name, 'homos2.npy'), np.concatenate(homos_seq_2, 0))
-        #
-        #
-        #
-        # results.close()
+
+            results.write(
+                '\nFrame {}, PSNR: {:.3f},  SSIM: {:.3f}, MACE: {:.3f}, MACE_m: {:.3f}, MACE_l: {:.3f} IoU: {:.3f} DiCE: {:.3f} IoU_HL: - DiCE_HL: -\n'.format(
+                    name, metrics_values['psnr'], metrics_values['ssim'],
+                    metrics_values['MACE'], metrics_values['MACE_med'], metrics_values['MACE_low'],
+                    metrics_values['iou'], metrics_values['dice']))
+
+        results.close()
 
     metric_averages = {m: sum(metric_cumltive[m])/len(metric_cumltive[m]) for m in metrics}
     metric_hl_averages = {m: sum(metrics_hl[m]) / len(metrics_hl[m]) for m in metrics}
@@ -734,26 +716,26 @@ def main(args):
     os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
 
-    tasks = [task for task in ['segment', 'deblur', 'homography'] if getattr(args, task)]
+    tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
 
     transformations = {'test': transforms.Compose([ToTensor(), Normalize()])}
-    data = {'test': MTL_TestDataset(tasks, args.data_path, 'val', args.seq_len, transform=transformations['test'])}
-    loader = {'test': DataLoader(data['test'], batch_size=args.bs, shuffle=False, num_workers=0, pin_memory=False)}
+    data = {'test': MTL_TestDataset(tasks, args.data_path, 'test', args.seq_len, transform=transformations['test'])}
+    loader = {'test': DataLoader(data['test'], batch_size=args.bs, shuffle=False, num_workers=1, pin_memory=False)}
 
 
     metrics_dict = {
         'segment': SegmentationMetrics().to(args.device),
         'deblur': DeblurringMetrics().to(args.device),
-        'homography': HomographyMetrics().to(args.device)}
+        'flow': OpticalFlowMetrics().to(args.device)
+
+    }
     metrics_dict = {k: v for k, v in metrics_dict.items() if k in tasks}
 
 
-    model = VideoMIMOUNet(tasks, args.block, args.nr_blocks).to(args.device)
+    model = VideoMIMOUNet(args, tasks, nr_blocks=args.nr_blocks, block=args.block).to(args.device)
     model = torch.nn.DataParallel(model).to(args.device)
-
     # Load checkpoint
-    checkpoint_file_name = '/home/efklidis/models/MICCAI-1' #MICCAI-2
-    resume_path = os.path.join(checkpoint_file_name, 'ckpt_{}.pth'.format(75)) #79
+    resume_path = os.path.join(args.out, 'ckpt_{}.pth'.format(70)) #79
     state_dict = torch.load(resume_path)['state']
     model.load_state_dict(state_dict, strict=True)
 
@@ -767,14 +749,15 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_real', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/results/MICCAI-2/', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str) #/media/efklidis/4TB/ # ../raid/data_ours_new_split
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/RESULTS-ECAI/mostnet-sw/', type=str)
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=5, type=int)
+    parser.add_argument("--device", dest='device', default="cuda", type=str)
 
     parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
-    parser.add_argument("--homography", action='store_false', help="Flag for  homography estimation")
+    parser.add_argument("--flow", action='store_false', help="Flag for  optical flow")
     parser.add_argument("--resume", action='store_true', help="Flag for resume training")
 
     parser.add_argument('--bs', help='Set size of the batch size', default=1, type=int)
