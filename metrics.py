@@ -98,10 +98,10 @@ class DeblurringMetrics(Module):
 		return metric_results
 
 
-class SegmentationMetrics(Module):
+class DetectionMetrics(Module):
 
 	def __init__(self):
-		super(SegmentationMetrics, self).__init__()
+		super(DetectionMetrics, self).__init__()
 		self.metrics = {
 			'iou': IoU(),
 			'dice': Dice()

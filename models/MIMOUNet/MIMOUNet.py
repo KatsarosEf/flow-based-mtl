@@ -80,8 +80,8 @@ class ExpandingBlock(nn.Module):
 
         self.ConvsOutS = nn.ModuleList(
             [SD(base_channel * 4),
-             SD(base_channel * 2 + 2 + 2),
-             SD(base_channel * 1 + 2 + 2)])
+             SD(base_channel * 2 + 2),
+             SD(base_channel * 1 + 2)])
 
         self.ConvsOutD = nn.ModuleList(
             [DD(base_channel * 4),
@@ -98,19 +98,15 @@ class ExpandingBlock(nn.Module):
             BasicConv(base_channel*4, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=True),
             BasicConv(base_channel*2, base_channel, kernel_size=4, relu=True, stride=2, transpose=True)])
 
-    def forward(self, x_curr, f_curr, f_prv, m_prv, d_prv):
+    def forward(self, x_curr, f_curr):
         x1_4, x1_2, x1_1 = x_curr
         f1_4, f1_2, f1_1 = f_curr
-        f2_4, f2_2, f2_1 = f_prv
-        m2_4, m2_2, m2_1 = m_prv
-        d2_4, d2_2, d2_1 = d_prv
         outputsD, outputsS, outputsOF = list(), list(), list()
 
         ################################ SCALE 4 ######################################
 
         ### Deblurring
-        F4 = self.FAMS[0](f1_4, f2_4)
-        z4 = self.Decoder[0](F4)
+        z4 = self.Decoder[0](f1_4)
         d1_4 = self.ConvsOutD[0](z4) + x1_4
         outputsD.append(d1_4)
 
@@ -118,22 +114,12 @@ class ExpandingBlock(nn.Module):
         m1_4 = self.ConvsOutS[0](z4)
         outputsS.append(m1_4)
 
-        ### Flow
-        off4 = self.of_est4(self.FAH[0](f1_4, m1_4, d1_4), self.FAH[0](f2_4, m2_4, d2_4)) # offsets 200x200 feature res 200x200
-        off4_up = F.interpolate(off4, scale_factor=2.0) * 2.0
-        outputsOF.append(F.interpolate(off4, (800, 800))*4.0)
-
-        wf2_2 = warp_flow(f2_2, off4_up)
-        wm2_2 = warp_flow(m2_2, off4_up)
-        wd2_2 = warp_flow(d2_2, off4_up)
 
 
         ################################ SCALE 2 ######################################
 
         ### Deblurring
-        F2 = self.FAMS[1](f1_2, wf2_2)
         z2 = self.feat_extract[0](z4)
-        z2 = torch.cat([z2, F2], dim=1)
         z2 = self.Convs[0](z2)
         z2 = self.Decoder[1](z2)
         d1_2 = self.ConvsOutD[1](z2) + x1_2
@@ -141,23 +127,14 @@ class ExpandingBlock(nn.Module):
 
         ### Segmentation
         m1_4_up = F.interpolate(m1_4, scale_factor=2)
-        m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up, off4_up], 1)) + m1_4_up
+        m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up], 1)) + m1_4_up
         outputsS.append(m1_2)
 
-        off2 = self.of_est2(self.FAH[1](f1_2, m1_2, d1_2), self.FAH[1](wf2_2, wm2_2, wd2_2)) + off4_up
-        off2_up = F.interpolate(off2, scale_factor=2.0) * 2.0
-        outputsOF.append(off2_up)
-
-        wf2_1 = warp_flow(f2_1, off2_up)
-        wm2_1 = warp_flow(m2_1, off2_up)
-        wd2_1 = warp_flow(d2_1, off2_up)
 
         ################################ SCALE 1 ######################################
 
         ### Deblurring
-        F1 = self.FAMS[2](f1_1, wf2_1)
         z1 = self.feat_extract[1](z2)
-        z1 = torch.cat([z1, F1], dim=1)
         z1 = self.Convs[1](z1)
         z1 = self.Decoder[2](z1)
         d1_1 = self.ConvsOutD[2](z1) + x1_1
@@ -165,12 +142,9 @@ class ExpandingBlock(nn.Module):
 
         ### Segmentation
         m1_2_up = F.interpolate(m1_2, scale_factor=2)
-        m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up, off2_up], 1)) + m1_2_up
+        m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up], 1)) + m1_2_up
         outputsS.append(m1_1)
 
-        # ### Flow
-        off = self.of_est(self.FAH[2](f1_1, m1_1, d1_1), self.FAH[2](wf2_1, wm2_1, wd2_1)) + off2_up
-        outputsOF.append(off)
 
         return [outputsS, outputsD, outputsOF]
 
@@ -182,16 +156,10 @@ class VideoMIMOUNet(nn.Module):
         self.decoder = ExpandingBlock(args, block, 2).to(args.device)
         self.args = args
 
-    def forward_inference(self, x2, x1, m2, d2):
-        x1, f1 = self.encoder(x1)
-        y1 = self.decoder(x1, f1, f1, m2, d2)
-        return y1
+    def forward(self, x1):
 
-    def forward(self, x2, x1, m2, d2):
-
-        x2, f2 = self.encoder(x2)
         x1, f1 = self.encoder(x1)
-        y1 = self.decoder(x1, f1, f2, m2, d2)
+        y1 = self.decoder(x1, f1)
         return y1
 
 

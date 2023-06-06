@@ -11,8 +11,17 @@ from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
 from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize
-from utils.network_utils import model_save, model_load, gridify
-import torch.nn.functional as F
+from utils.network_utils import model_save, model_load
+from kornia.filters.motion import motion_blur
+
+
+def sample_odd_numbers(max, n):
+    assert max%2==0
+    # Generate a tensor of size n filled with sequential numbers starting from 1
+    all_numbers = torch.arange(3, max, 2)
+    sampled_idx = torch.randint(0, len(all_numbers), (n,))
+    numbers = all_numbers[sampled_idx]
+    return numbers
 
 task_weights = {'segment': 1,
                 'deblur': 10,
@@ -31,28 +40,18 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
 
     for seq_num, seq in enumerate(dataloader):
         for frame in range(args.prev_frames, args.seq_len):
-
             # Load the data and mount them on cuda
-            if frame == args.prev_frames:
-                frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200), device='cuda'),
-                      torch.zeros((frames[0].shape[0], 2, 400, 400), device='cuda'),
-                      torch.zeros((frames[0].shape[0], 2, 800, 800), device='cuda')]
-                d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
-                      F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
-                      seq['image'][0].to(args.device)]
-            else:
-                frames.append(seq['image'][frame].to(args.device))
-                del frames[0]
-
             gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
             [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
+            kernel_size = sample_odd_numbers(30, args.bs)
+            angle = torch.randint(1, 2, (args.bs,)).float()
+            direction = torch.randint(90, 91, (args.bs,)).float()
+            blurry_input = torch.cat([motion_blur(gt_dict['deblur'][i].unsqueeze(0), kernel_size[i].item(), angle[i], direction[i]) for i in range(args.bs)])
+
             optimizer.zero_grad()
-            outputs = model(frames[0], frames[1], m2, d2)
+            outputs = model(blurry_input)
             outputs = dict(zip(tasks, outputs))
-            m2 = [x.detach() for x in outputs['segment']]
-            d2 = [x.detach() for x in outputs['deblur']]
 
             losses = {task: losses_dict[task](outputs[task], gt_dict[task])*task_weights[task] for task in tasks}
             loss = sum(losses.values())
@@ -90,20 +89,12 @@ def val(args, dataloader, model, metrics_dict, epoch):
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
     metric_cumltive = {k: [] for k in metrics}
     model.train()
-    videos2make = [[] for i in range(args.bs*args.to_visualize)]
-    i = 0
     with torch.no_grad():
         for seq_idx, seq in enumerate(dataloader):
             for frame in range(args.prev_frames, args.seq_len):
                 # Load the data and mount them on cuda
                 if frame == args.prev_frames:
                     frames = [seq['image'][i].to(args.device) for i in range(frame + 1)]
-                    m2 = [torch.zeros((frames[0].shape[0], 2, 200, 200), device='cuda'),
-                          torch.zeros((frames[0].shape[0], 2, 400, 400), device='cuda'),
-                          torch.zeros((frames[0].shape[0], 2, 800, 800), device='cuda')]
-                    d2 = [F.interpolate(seq['image'][0], scale_factor=0.25).to(args.device),
-                          F.interpolate(seq['image'][0], scale_factor=0.5).to(args.device),
-                          seq['image'][0].to(args.device)]
                 else:
                     frames.append(seq['image'][frame].to(args.device))
                     del frames[0]
@@ -111,7 +102,12 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
                 [e.to(args.device) for e in seq[task][frame]] for task in tasks}
 
-                outputs = model(frames[0], frames[1], m2, d2)
+                kernel_size = sample_odd_numbers(30, args.bs)
+                angle = torch.randint(1, 2, (args.bs,)).float()
+                direction = torch.randint(90, 91, (args.bs,)).float()
+                blurry_input = torch.cat([motion_blur(gt_dict['deblur'][i].unsqueeze(0), kernel_size[i].item(), angle[i], direction[i]) for i in range(args.bs)])
+
+                outputs = model(blurry_input)
                 outputs = dict(zip(tasks, outputs))
 
                 task_metrics = {task: metrics_dict[task](outputs[task], gt_dict[task]) for task in tasks}
@@ -123,19 +119,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
                 for metric in metrics:
                     metric_cumltive[metric].append(metrics_values[metric])
 
-                # visualize batch size (manually coded for 2)
-                if seq_idx < args.to_visualize:
-                    grids = [gridify(args, seq, outputs, d2, frame, batch_idx) for batch_idx in range(args.bs)]
-                    videos2make[i].append(grids[0])
-                    videos2make[i+1].append(grids[1])
 
-                m2 = outputs['segment']
-                d2 = outputs['deblur']
-
-            # Add the end of the small, 5-frame, sequences, log the videos, 2xvideos per batch
-            if seq_idx < args.to_visualize:
-                [wandb.log({"video_{}".format(idx): wandb.Video(np.stack((videos2make[idx])).transpose((0,3,1,2)).astype(np.uint8), fps=1)}) for idx in range(0+i, i+2)]
-                i += 2
 
         metric_averages = {m: sum(metric_cumltive[m])/len(metric_cumltive[m]) for m in metrics}
         print("\n[VALIDATION] [EPOCH:{}/{}] {}\n".format(epoch, args.epochs,
@@ -149,7 +133,7 @@ def val(args, dataloader, model, metrics_dict, epoch):
 def main(args):
 
 
-    tasks = [task for task in ['segment', 'deblur', 'flow'] if getattr(args, task)]
+    tasks = [task for task in ['detect', 'deblur'] if getattr(args, task)]
 
     transformations = {'train': transforms.Compose([ToTensor(), Normalize()]),
                        'val': transforms.Compose([ToTensor(), Normalize()])}
@@ -162,14 +146,14 @@ def main(args):
 
 
     losses_dict = {
-        'segment': SemanticSegmentationLoss(args).to(args.device),
+        'detect': DetectionLoss(args).to(args.device),
         'deblur': DeblurringLoss(args).to(args.device),
         'flow': OpticalFlowLoss(args).to(args.device)
     }
     losses_dict = {k: v for k, v in losses_dict.items() if k in tasks}
 
     metrics_dict = {
-        'segment': SegmentationMetrics().to(args.device),
+        'detect': DetectionMetrics().to(args.device),
         'deblur': DeblurringMetrics().to(args.device),
         'flow': OpticalFlowMetrics().to(args.device)
 
@@ -214,18 +198,15 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser(description='Parser of Training Arguments')
 
-    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/media/efklidis/4TB/dblab_ecai', type=str)
-    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/ecai-mtl-overfit-debug', type=str)
-
-    # parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='../dblab_ecai', type=str)
-    # parser.add_argument('--out', dest='out', help='Set output path', default='../ecai-mtl-mostnet-fw', type=str)
+    parser.add_argument('--data', dest='data_path', help='Set dataset root_path', default='/home/efklidis/Downloads/archive/NordTank586x371', type=str)
+    parser.add_argument('--out', dest='out', help='Set output path', default='/media/efklidis/4TB/mtl-drone-debug', type=str)
 
     parser.add_argument('--block', dest='block', help='Type of block "fft", "res", "inverted", "inverted_fft" ', default='res', type=str)
     parser.add_argument('--nr_blocks', dest='nr_blocks', help='Number of blocks', default=4, type=int)
 
-    parser.add_argument("--segment", action='store_false', help="Flag for segmentation")
+    parser.add_argument("--detect", action='store_false', help="Flag for detection")
     parser.add_argument("--deblur", action='store_false', help="Flag for  deblurring")
-    parser.add_argument("--flow", action='store_false', help="Flag for  homography estimation")
+    parser.add_argument("--flow", action='store_true', help="Flag for  homography estimation")
 
     parser.add_argument('--lr', help='Set learning rate', default=1e-4, type=float)
     parser.add_argument('--wdecay', type=float, default=.0005)
@@ -233,9 +214,9 @@ if __name__ == '__main__':
     parser.add_argument('--clip', type=float, default=0.9)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
     parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
-    parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=5, type=int)
+    parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=1, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=150, type=int)
-    parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=1, type=int)
+    parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=0, type=int)
     parser.add_argument("--device", dest='device', default="cuda", type=str)
 
     parser.add_argument('--epochs', dest='epochs', help='Set number of epochs', default=120, type=int)

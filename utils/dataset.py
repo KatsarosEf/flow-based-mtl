@@ -24,7 +24,7 @@ class MTL_Dataset(data.Dataset):
                  root='./DST-dataset/', split='train', seq_len=20, transform=None,
                  meta=True, overfit=False):
 
-        do_seg = 'segment' in tasks
+        do_dec = 'detect' in tasks
         do_deblur = 'deblur' in tasks
         do_flow = 'flow' in tasks
         self.root = root
@@ -35,8 +35,8 @@ class MTL_Dataset(data.Dataset):
         # Images
         self.images = []
         # Semantic Segmentation
-        self.do_seg = do_seg
-        self.masks = []
+        self.do_dec = do_dec
+        self.dets = []
         # Deblurring
         self.do_deblur = do_deblur
         self.deblur_frames = []
@@ -46,10 +46,10 @@ class MTL_Dataset(data.Dataset):
 
         dataset_dir = os.path.join(root, self.split)
         for video in os.listdir(dataset_dir):
-            image_dir, deblur_dir, mask_dir, of_dir = [os.path.join(dataset_dir, video, directory)
-                                                         for directory in ['input', 'GT', 'masks', 'OF_backw']]
+            image_dir, deblur_dir, dect_dir, of_dir = [os.path.join(dataset_dir, video, directory)
+                                                         for directory in ['input', 'GT', 'bboxes', 'OF_backw']]
 
-            filenames = sorted(os.listdir(image_dir), key=lambda x: int(os.path.basename(x)[:-4]))
+            filenames = sorted(os.listdir(deblur_dir))
             if seq_len is None:
                 seq_len_inner = len(filenames)
             else:
@@ -57,21 +57,17 @@ class MTL_Dataset(data.Dataset):
 
             for first_idx in range(0, len(filenames)-seq_len_inner+1, seq_len_inner):
 
-                seq_images, seq_masks, seq_deblur_frames, seq_flows = ([] for _ in range(4))
+                seq_images, seq_dets, seq_deblur_frames, seq_flows = ([] for _ in range(4))
 
                 for file_idx in range(first_idx, first_idx + seq_len_inner):
 
                     filename = filenames[file_idx]
-                    # Images
-                    _image = os.path.join(image_dir, filename)
-                    assert os.path.isfile(_image)
-                    seq_images.append(_image)
+
 
                     # Semantic Segmentation
-                    if do_seg:
-                        _mask = os.path.join(mask_dir, filename[:-4] + '.png')
-                        assert os.path.isfile(_mask)
-                        seq_masks.append(_mask)
+                    if do_dec:
+                        _text = os.path.join(dect_dir, filename[:-4] + '.txt')
+                        seq_dets.append(_text)
 
                     # Deblurring
                     if do_deblur:
@@ -90,8 +86,7 @@ class MTL_Dataset(data.Dataset):
                             assert os.path.isfile(_optical_flow)
                             seq_flows.append(_optical_flow)
 
-                self.images.append(seq_images)
-                self.masks.append(seq_masks)
+                self.dets.append(seq_dets)
                 self.deblur_frames.append(seq_deblur_frames)
                 self.flows.append(seq_flows)
 
@@ -103,7 +98,7 @@ class MTL_Dataset(data.Dataset):
             self.images = [self.images[0]][:n_of]
 
         # Display stats
-        print('Number of {} dataset sequences: {:d}'.format(self.split, len(self.images)))
+        print('Number of {} dataset sequences: {:d}'.format(self.split, len(self.deblur_frames)))
         print('Number of sequence frames: {:d}'.format(seq_len))
 
     def __getitem__(self, index):
@@ -111,8 +106,8 @@ class MTL_Dataset(data.Dataset):
         _img = self._load_img(index)
         sample = {'image': _img}
 
-        if self.do_seg:
-            sample['segment'] = self._load_mask(index)
+        if self.do_dec:
+            sample['detect'] = self._load_det(index)
 
         if self.do_deblur:
             sample['deblur'] = self._load_deblur(index)
@@ -136,8 +131,8 @@ class MTL_Dataset(data.Dataset):
     def _load_deblur(self, index):
         return [cv2.imread(path).astype(np.float32) for path in self.deblur_frames[index]]
 
-    def _load_mask(self, index):
-        return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.masks[index]]
+    def _load_det(self, index):
+        return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.dets[index]]
 
     def _load_flow(self, index):
         return [np.load(path).astype(np.float32) for path in self.flows[index]] # need to process flow to

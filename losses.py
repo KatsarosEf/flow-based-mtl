@@ -3,10 +3,10 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class SemanticSegmentationLoss(nn.Module):
+class DetectionLoss(nn.Module):
 
 	def __init__(self, args, ce_factor=1, device='cuda'):
-		super(SemanticSegmentationLoss, self).__init__()
+		super(DetectionLoss, self).__init__()
 		self.cross_entropy_loss = nn.CrossEntropyLoss(reduction='mean').to(device)
 		self.ce_factor = ce_factor
 		self.gamma = args.gamma
