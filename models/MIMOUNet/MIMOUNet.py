@@ -1,7 +1,7 @@
 from models.MIMOUNet.layers import *
-from models.HomoEstimator import HomoEstimator4, HomoEstimator2, HomoEstimator
-from utils.network_utils import warp_flow
+
 import torch.nn.functional as F
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 class ContractingBlock(nn.Module):
     def __init__(self, args, block, nr_blocks=5):
@@ -32,8 +32,11 @@ class ContractingBlock(nn.Module):
         ])
 
     def forward(self, x1):
+        x1 = F.pad(x1, (1,1,0,1), "reflect")
         x2 = F.interpolate(x1, scale_factor=0.5)
         x4 = F.interpolate(x2, scale_factor=0.5)
+
+
 
         z2 = self.SCM2(x2)
         z4 = self.SCM4(x4)
@@ -68,8 +71,8 @@ class ExpandingBlock(nn.Module):
             DBlock(base_channel, 2, name=block)])
 
         self.Convs = nn.ModuleList([
-            BasicConv(base_channel * 4, base_channel * 2, kernel_size=3, relu=True, stride=1),
-            BasicConv(base_channel * 2, base_channel, kernel_size=3, relu=True, stride=1)])
+            BasicConv(base_channel * 2, base_channel * 2, kernel_size=3, relu=True, stride=1),
+            BasicConv(base_channel, base_channel, kernel_size=3, relu=True, stride=1)])
 
 
         self.ConvsOutD = nn.ModuleList(
@@ -81,20 +84,30 @@ class ExpandingBlock(nn.Module):
             BasicConv(base_channel*4, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=True),
             BasicConv(base_channel*2, base_channel, kernel_size=4, relu=True, stride=2, transpose=True)])
 
-        self.predict_bboxes = nn.ModuleList([
-            BasicConv(base_channel*7, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=False),
-            nn.AdaptiveAvgPool2d((2,2)),
-            BasicConv(base_channel * 2, base_channel * 4, kernel_size=4, relu=True, stride=2, transpose=False),
-            nn.AdaptiveAvgPool2d((2, 2)),
-            BasicConv(base_channel*4, base_channel*8, kernel_size=4, relu=True, stride=2, transpose=False)])
+        self.detector_features = nn.Sequential(
+            DBlock(base_channel * 7, name=block),
+            nn.AdaptiveAvgPool2d((45, 75)),
+            BasicConv(base_channel*7, base_channel*14, kernel_size=3, relu=True, stride=1, transpose=False),
+
+            DBlock(base_channel * 14, name=block),
+            nn.AdaptiveAvgPool2d((22, 37)),
+            BasicConv(base_channel * 14, base_channel * 28, kernel_size=3, relu=True, stride=1, transpose=False),
+
+            DBlock(base_channel * 28, name=block),
+            nn.AdaptiveAvgPool2d((1, 1))
+        )
+
+        self.predictor = FastRCNNPredictor(base_channel * 28, 2)
+
+
 
     def forward(self, x_curr, f_curr):
         x1_4, x1_2, x1_1 = x_curr
         f1_4, f1_2, f1_1 = f_curr
         outputsD = list()
         down_feats = [f1_4,
-                      F.interpolate(f1_2, (200, 200)),
-                      F.interpolate(f1_1, (200, 200))]
+                      F.interpolate(f1_2, (93, 147)),
+                      F.interpolate(f1_1, (93, 147))]
         ################################ SCALE 4 ######################################
 
         ### Deblurring
@@ -120,7 +133,8 @@ class ExpandingBlock(nn.Module):
         d1_1 = self.ConvsOutD[2](z1) + x1_1
         outputsD.append(d1_1)
 
-        detections = self.predict_bboxes(down_feats)
+        detections = self.predictor(self.detector_features(torch.cat([*down_feats], 1)))
+
 
         return [detections, outputsD]
 

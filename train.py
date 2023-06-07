@@ -13,6 +13,9 @@ from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize
 from utils.network_utils import model_save, model_load
 from kornia.filters.motion import motion_blur
+import torch
+import utils
+
 
 
 def sample_odd_numbers(max, n):
@@ -32,7 +35,7 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
 
 def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_dict, epoch):
-    tasks = model.module.tasks
+    tasks = [task for task in ['detect', 'deblur'] if getattr(args, task)]
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
     metric_cumltive = {k: [] for k in metrics}
     losses_cumltive = {k: [] for k in tasks}
@@ -42,7 +45,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
         for frame in range(args.prev_frames, args.seq_len):
             # Load the data and mount them on cuda
             gt_dict = {task: seq[task][frame].to(args.device) if type(seq[task][frame]) is torch.Tensor else
-            [e.to(args.device) for e in seq[task][frame]] for task in tasks}
+            [{k:v.to(args.device) for k, v in seq[task][frame].items()}] for task in tasks}
 
             kernel_size = sample_odd_numbers(30, args.bs)
             angle = torch.randint(1, 2, (args.bs,)).float()
@@ -85,7 +88,7 @@ def train(args, dataloader, model, optimizer, scheduler, losses_dict, metrics_di
 
 def val(args, dataloader, model, metrics_dict, epoch):
 
-    tasks = model.module.tasks
+    tasks = [task for task in ['detect', 'deblur'] if getattr(args, task)]
     metrics = [k for task in tasks for k in metrics_dict[task].metrics]
     metric_cumltive = {k: [] for k in metrics}
     model.train()
@@ -165,7 +168,7 @@ def main(args):
     # params, fps, flops = measure_efficiency(args)
     # print(params, fps, flops)
 
-    model = torch.nn.DataParallel(model).to(args.device)
+    #model = torch.nn.DataParallel(model).to(args.device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
@@ -213,7 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=1e-8)
     parser.add_argument('--clip', type=float, default=0.9)
     parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--bs', help='Set size of the batch size', default=4, type=int)
+    parser.add_argument('--bs', help='Set size of the batch size', default=2, type=int)
     parser.add_argument('--seq_len', dest='seq_len', help='Set length of the sequence', default=1, type=int)
     parser.add_argument('--max_flow', dest='max_flow', help='Set magnitude of flows to exclude from loss', default=150, type=int)
     parser.add_argument('--prev_frames', dest='prev_frames', help='Set number of previous frames', default=0, type=int)

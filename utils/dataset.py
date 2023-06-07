@@ -10,6 +10,7 @@ import os
 import pickle
 
 import cv2
+import torch
 import torch.utils.data as data
 import numpy as np
 
@@ -114,7 +115,6 @@ class MTL_Dataset(data.Dataset):
         if self.do_flow:
             sample['flow'] = self._load_flow(index)
 
-
         if self.transform is not None:
             sample = self.transform(sample)
 
@@ -125,7 +125,21 @@ class MTL_Dataset(data.Dataset):
         return [cv2.imread(path).astype(np.float32) for path in self.deblur_frames[index]]
 
     def _load_det(self, index):
-        txt_file = [open(path, "r").read().splitlines() for path in self.dets[index]]
+        try:
+            txt_files = [open(path, "r").read().splitlines() for path in self.dets[index]]
+            anno = []
+            for txt_file in txt_files:
+                for line in txt_file:
+                    _anno = line.split(' ')
+                anno.append({'class': torch.tensor(_anno[0], dtype=torch.float32),
+                             'coords': [torch.tensor(x) for x in _anno[1:5]]})
+        except OSError:
+            anno = []
+            anno.append({'class': torch.tensor(0, dtype=torch.float32),
+                         'coords': torch.tensor([0., 0., 0., 0.])})
+        return anno
+
+
 
 
     def _load_flow(self, index):

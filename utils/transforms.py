@@ -220,9 +220,8 @@ class ToTensor(object):
 
     def __call__(self, sample):
 
-        sample.update({'image': [torch.from_numpy(_image).permute(2, 0, 1) for _image in sample['image']]})
-        if 'segment' in sample.keys():
-            sample.update({'segment': [torch.from_numpy((_mask > 125).astype(float)).type(torch.LongTensor) for _mask in sample['segment']]})
+        #sample.update({'image': [torch.from_numpy(_image).permute(2, 0, 1) for _image in sample['image']]})
+
         if 'deblur' in sample.keys():
             sample.update({'deblur': [torch.from_numpy(_deblur).permute(2, 0, 1) for _deblur in sample['deblur']]})
         if 'flow' in sample.keys():
@@ -236,7 +235,7 @@ class Normalize(object):
 
     def __call__(self, sample):
 
-        sample.update({'image': [_image/255 for _image in sample['image']]})
+        # sample.update({'image': [_image/255 for _image in sample['image']]})
         if 'deblur' in sample.keys():
             sample.update({'deblur': [_deblur/255 for _deblur in sample['deblur']]})
         # Change from absolute positions to offsets
