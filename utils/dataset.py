@@ -103,8 +103,7 @@ class MTL_Dataset(data.Dataset):
 
     def __getitem__(self, index):
 
-        _img = self._load_img(index)
-        sample = {'image': _img}
+        sample = dict()
 
         if self.do_dec:
             sample['detect'] = self._load_det(index)
@@ -115,31 +114,27 @@ class MTL_Dataset(data.Dataset):
         if self.do_flow:
             sample['flow'] = self._load_flow(index)
 
-        if self.meta:
-            sample['meta'] = {'paths': self.images[index],
-                              'im_size': (_img[0].shape[0], _img[0].shape[1]),
-                              'transformations': {}}
 
         if self.transform is not None:
             sample = self.transform(sample)
 
         return sample
 
-    def _load_img(self, index):
-        return [cv2.imread(path).astype(np.float32) for path in self.images[index]]
 
     def _load_deblur(self, index):
         return [cv2.imread(path).astype(np.float32) for path in self.deblur_frames[index]]
 
     def _load_det(self, index):
-        return [cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32) for path in self.dets[index]]
+        txt_file = [open(path, "r").read().splitlines() for path in self.dets[index]]
+        # TODO
+
 
     def _load_flow(self, index):
         return [np.load(path).astype(np.float32) for path in self.flows[index]] # need to process flow to
 
 
     def __len__(self):
-        return len(self.images)
+        return len(self.deblur_frames)
 
     def __str__(self):
         return 'DST Multitask (split=' + str(self.split) + ')'

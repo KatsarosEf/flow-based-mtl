@@ -7,8 +7,8 @@ from utils.dataset import MTL_Dataset
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from losses import DeblurringLoss, SemanticSegmentationLoss, OpticalFlowLoss
-from metrics import SegmentationMetrics, DeblurringMetrics, OpticalFlowMetrics
+from losses import DeblurringLoss, DetectionLoss, OpticalFlowLoss
+from metrics import DetectionMetrics, DeblurringMetrics, OpticalFlowMetrics
 from models.MIMOUNet.MIMOUNet import VideoMIMOUNet
 from utils.transforms import ToTensor, Normalize
 from utils.network_utils import model_save, model_load
@@ -141,7 +141,7 @@ def main(args):
     data = {split: MTL_Dataset(tasks, args.data_path, split, args.seq_len, transform=transformations[split])
             for split in ['train', 'val']}
 
-    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=split=='train', num_workers=4, pin_memory=True, drop_last=True)
+    loader = {split: DataLoader(data[split], batch_size=args.bs, shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
               for split in ['train', 'val']}
 
 

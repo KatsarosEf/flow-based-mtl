@@ -62,11 +62,6 @@ class ExpandingBlock(nn.Module):
         super(ExpandingBlock, self).__init__()
         base_channel = 32
 
-        self.of_est4 = HomoEstimator4()
-        self.of_est2 = HomoEstimator2()
-        self.of_est = HomoEstimator()
-
-
         self.Decoder = nn.ModuleList([
             DBlock(base_channel * 4, 2, name=block),
             DBlock(base_channel * 2, 2, name=block),
@@ -76,45 +71,36 @@ class ExpandingBlock(nn.Module):
             BasicConv(base_channel * 4, base_channel * 2, kernel_size=3, relu=True, stride=1),
             BasicConv(base_channel * 2, base_channel, kernel_size=3, relu=True, stride=1)])
 
-        self.FAMS = nn.ModuleList([GSA(128), GSA(64), GSA(32)])
-
-        self.ConvsOutS = nn.ModuleList(
-            [SD(base_channel * 4),
-             SD(base_channel * 2 + 2),
-             SD(base_channel * 1 + 2)])
 
         self.ConvsOutD = nn.ModuleList(
             [DD(base_channel * 4),
              DD(base_channel * 2),
              DD(base_channel * 1)])
 
-        self.FAH = nn.ModuleList(
-            [FAM_homo(base_channel * 4),
-             FAM_homo(base_channel * 2),
-             FAM_homo(base_channel * 1)]
-        )
-
         self.feat_extract = nn.ModuleList([
             BasicConv(base_channel*4, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=True),
             BasicConv(base_channel*2, base_channel, kernel_size=4, relu=True, stride=2, transpose=True)])
 
+        self.predict_bboxes = nn.ModuleList([
+            BasicConv(base_channel*7, base_channel*2, kernel_size=4, relu=True, stride=2, transpose=False),
+            nn.AdaptiveAvgPool2d((2,2)),
+            BasicConv(base_channel * 2, base_channel * 4, kernel_size=4, relu=True, stride=2, transpose=False),
+            nn.AdaptiveAvgPool2d((2, 2)),
+            BasicConv(base_channel*4, base_channel*8, kernel_size=4, relu=True, stride=2, transpose=False)])
+
     def forward(self, x_curr, f_curr):
         x1_4, x1_2, x1_1 = x_curr
         f1_4, f1_2, f1_1 = f_curr
-        outputsD, outputsS, outputsOF = list(), list(), list()
-
+        outputsD = list()
+        down_feats = [f1_4,
+                      F.interpolate(f1_2, (200, 200)),
+                      F.interpolate(f1_1, (200, 200))]
         ################################ SCALE 4 ######################################
 
         ### Deblurring
         z4 = self.Decoder[0](f1_4)
         d1_4 = self.ConvsOutD[0](z4) + x1_4
         outputsD.append(d1_4)
-
-        ### Segmentation
-        m1_4 = self.ConvsOutS[0](z4)
-        outputsS.append(m1_4)
-
-
 
         ################################ SCALE 2 ######################################
 
@@ -125,12 +111,6 @@ class ExpandingBlock(nn.Module):
         d1_2 = self.ConvsOutD[1](z2) + x1_2
         outputsD.append(d1_2)
 
-        ### Segmentation
-        m1_4_up = F.interpolate(m1_4, scale_factor=2)
-        m1_2 = self.ConvsOutS[1](torch.cat([z2, m1_4_up], 1)) + m1_4_up
-        outputsS.append(m1_2)
-
-
         ################################ SCALE 1 ######################################
 
         ### Deblurring
@@ -140,13 +120,9 @@ class ExpandingBlock(nn.Module):
         d1_1 = self.ConvsOutD[2](z1) + x1_1
         outputsD.append(d1_1)
 
-        ### Segmentation
-        m1_2_up = F.interpolate(m1_2, scale_factor=2)
-        m1_1 = self.ConvsOutS[2](torch.cat([z1, m1_2_up], 1)) + m1_2_up
-        outputsS.append(m1_1)
+        detections = self.predict_bboxes(down_feats)
 
-
-        return [outputsS, outputsD, outputsOF]
+        return [detections, outputsD]
 
 class VideoMIMOUNet(nn.Module):
     def __init__(self, args, tasks, block, nr_blocks):
