@@ -126,7 +126,6 @@ class MTL_Dataset(data.Dataset):
 
     def _load_det(self, index):
         txt_file = [open(path, "r").read().splitlines() for path in self.dets[index]]
-        # TODO
 
 
     def _load_flow(self, index):
